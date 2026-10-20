@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "testrail": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/testrail-server.mjs"],
+      "env": {
+        "QA_PROJECT_DIR": "${CLAUDE_PROJECT_DIR}"
+      }
+    }
+  }
+}

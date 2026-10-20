@@ -1,0 +1,56 @@
+---
+name: generate-tests
+description: Write Playwright specs for TestRail cases the QA lead has approved, run them, and open a spec PR for review (Gate 2). Use after Gate 1 approval, or when the user asks to automate cases.
+argument-hint: "<TestRail section id, plan file in specs/, or case ids like C12 C13>"
+disable-model-invocation: true
+---
+
+# Generate tests for approved cases
+
+Input: `$ARGUMENTS`
+
+## 1. Pick the cases
+
+- Section id: `testrail_get_cases` with that `section_id`.
+- Plan file: read the `**TestRail:** C…` ids from it.
+- Case ids: `testrail_get_case` for each.
+
+Keep only cases whose `review` is `approved` (when a review field is configured) and that are not already
+automated. Find existing tests for these ids with
+`grep -rn "tr('C" tests/` so you don't write a second test for the same case. If nothing is left, say so and stop.
+
+## 2. Generate
+
+Create a branch `qa/tests-<feature-slug>`. Use the **playwright-test-generator** agent, one spec file per
+feature, at `tests/<area>/<feature-slug>.spec.ts`. Give it the plan file, the case details and these rules,
+which match `CLAUDE.md`:
+
+- Import `test` and `expect` from `../fixtures` (adjust the path), never from `@playwright/test` directly.
+- Every test carries its case id: `test('shows an error for an expired coupon', { annotation: tr('C1234') }, async ({ page }) => { ... })`.
+  This annotation is how results reach TestRail. Don't put the id in the title.
+- P1 cases also get `tag: '@smoke'`.
+- Locators: `getByRole`, `getByLabel`, `getByText`, then `getByTestId`. No CSS chains or XPath.
+- Every test ends with an assertion on the business outcome (an order exists, a total is right, an error
+  message is shown), not only that a page loaded. Use `toMatchAriaSnapshot` for regions where structure
+  matters.
+- No `waitForTimeout`, `page.pause()`, `test.only`, hard-coded credentials or production URLs.
+- Create test data through the API (`request` fixture) where possible instead of clicking through setup.
+
+## 3. Verify
+
+```bash
+node .qa/scripts/lint-specs.mjs tests/<area>/<feature-slug>.spec.ts
+npx playwright test tests/<area>/<feature-slug>.spec.ts --repeat-each=3
+```
+
+Fix lint findings. A test that fails because the app doesn't do what the case says is not a test problem:
+mark it `test.fixme()` with the reason and list it in the PR as a possible bug. Don't weaken the assertion.
+
+## 4. Open the PR (Gate 2)
+
+- Commit, push, and open a PR with `gh pr create --label qa:gate-2`.
+- PR body: a table of case id, title, file and line, priority; anything marked fixme and why; the
+  command to run the tests locally.
+- Call `testrail_mark_automated` for the cases in the PR.
+
+Tell the user the PR link and how many tests were added.

@@ -1,0 +1,27 @@
+{
+  "extraKnownMarketplaces": {
+    "qa-ai-kit": {
+      "source": {
+        "source": "github",
+        "repo": "YOUR_GITHUB_ORG/qa-ai-kit"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "qa-kit@qa-ai-kit": true
+  },
+  "enabledMcpjsonServers": ["playwright-test"],
+  "permissions": {
+    "allow": [
+      "Bash(npx playwright test:*)",
+      "Bash(npx playwright show-report:*)",
+      "Bash(node .qa/scripts/:*)",
+      "mcp__playwright-test"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./playwright/.auth/**)"
+    ]
+  }
+}

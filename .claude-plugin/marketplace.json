@@ -1,0 +1,14 @@
+{
+  "name": "qa-ai-kit",
+  "description": "Agency QA automation kit: Claude + Playwright test agents + TestRail",
+  "owner": {
+    "name": "Hammad Tariq"
+  },
+  "plugins": [
+    {
+      "name": "qa-kit",
+      "source": "./plugins/qa-kit",
+      "description": "Plan, generate, triage and report on Playwright tests with TestRail, with human review gates"
+    }
+  ]
+}

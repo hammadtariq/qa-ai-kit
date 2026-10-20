@@ -1,0 +1,8 @@
+.env
+.env.local
+reports/
+test-results/
+playwright-report/
+playwright/.auth/
+.qa-cache/
+.mcp.json.qa-backup

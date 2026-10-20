@@ -1,0 +1,17 @@
+{
+  "name": "CLIENT_PROJECT_NAME",
+  "kitVersion": "0.1.0",
+  "testDir": "tests",
+  "testrail": {
+    "projectId": 0,
+    "suiteId": null,
+    "templateId": null,
+    "reviewField": null,
+    "automatedField": null
+  },
+  "triage": {
+    "maxFailures": 15,
+    "quarantineAfter": 3,
+    "flakyWindowDays": 7
+  }
+}
