@@ -12,6 +12,17 @@ the system of record, and people review at five gates. Follow these rules in eve
 - Main areas: AREA_LIST
 - Test data: TEST_DATA_NOTES
 
+### Designing test cases
+
+- Think like the owner of this business: read `.qa/business-context.md` first. A case exists to protect
+  something the owner would lose (money, stock, access, data, trust), and says so in a "Why it matters" line.
+- Acceptance criteria are the required business behaviour, verified against the implementation; a gap
+  between the two is a case or an open question, never an expected result.
+- Cover the realistic dirty paths (bad input, acting twice or out of order, lower roles via UI and API,
+  integrity across features, repeats, dates and money, recovery), not just the happy path.
+- No junk: one case per business outcome, journeys with checkpoints over fragments, data tables over
+  one-case-per-field. Playbook: `/qa-kit:plan-feature` follows `skills/plan-feature/test-design.md` in the kit.
+
 ### Writing tests
 
 - Tests live in `e2e/<area>/<feature>.spec.ts`. Import `test`, `expect` and `tr` from `e2e/fixtures.ts`.

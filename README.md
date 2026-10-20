@@ -42,6 +42,18 @@ docs/AGENCY-SETUP.md                 one-time TestRail, GitHub and Claude accoun
 | `/qa-kit:upkeep` | Weekly | – |
 | `/qa-kit:client-report [YYYY-MM]` | Monthly, for the client | – |
 
+## How cases are designed
+
+Every skill thinks like the owner of the client's business. `.qa/business-context.md` records the niche,
+what must never go wrong (money, stock, access, data) and how real users behave; the playbook
+[`test-design.md`](plugins/qa-kit/skills/plan-feature/test-design.md) turns that into cases:
+
+- acceptance criteria are the **required business behaviour, verified against the implementation**;
+- the realistic **dirty paths** are covered (bad input, acting twice or out of order, lower roles via UI
+  and API, cross-feature integrity, repeats, dates and money, recovery);
+- **no junk**: one case per business outcome, journeys with checkpoints, data tables instead of a case per
+  field, about 8–15 strong cases per feature, each with a "Why it matters" line.
+
 ## What a client repo gets
 
 - `playwright.config.ts`: JSON + JUnit reporters, isolated retries, storage-state login, and a
@@ -49,7 +61,7 @@ docs/AGENCY-SETUP.md                 one-time TestRail, GitHub and Claude accoun
 - `e2e/` (or the folder you choose): `fixtures.ts` with the `tr('C123')` helper, `auth.setup.ts`,
   `seed.spec.ts`, and `support/antd.ts` for Ant Design apps.
 - A QA conventions block appended to `CLAUDE.md`; the plugin and permissions merged into `.claude/settings.json`.
-- `.qa/config.json`, `.qa/app-setup.sh` (CI app prep: database, seed, build), `.qa/scripts/` (lint,
+- `.qa/business-context.md` (the owner's view of the product), `.qa/config.json`, `.qa/app-setup.sh` (CI app prep: database, seed, build), `.qa/scripts/` (lint,
   failure extraction, flaky history, Slack digest, id collection), `qa.env.example`.
 - `.github/actions/qa-app-setup` (npm, pnpm or Yarn and the right Node version, detected) and two workflows:
   - **qa-pr.yml**: lint specs, run changed tests and `@smoke`, upload to TestRail, and on failure Claude

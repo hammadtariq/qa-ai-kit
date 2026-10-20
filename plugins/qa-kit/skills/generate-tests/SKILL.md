@@ -35,11 +35,25 @@ which match `CLAUDE.md`:
 - Locators: `getByRole`, `getByLabel`, `getByText`, then `getByTestId`. No CSS chains or XPath.
   Use the helpers in `<testDir>/support/` for component-library widgets (for example `antSelect` for
   Ant Design selects) instead of raw clicks on dropdown options.
+- **One TestRail case = one test**, so each case gets one result. Keep the case's shape
+  (playbook: `${CLAUDE_PLUGIN_ROOT}/skills/plan-feature/test-design.md`):
+  - journey case → one test with a `test.step()` per checkpoint (create, approve, stock, ledger, report),
+    each ending in its own assertion, so a failure names the step;
+  - data-table case → one test that loops over the table rows, each row in its own `test.step()` with
+    `expect.soft` where later rows are still worth checking after one fails;
+  - permission case → act as the lower role through the UI **and** call the API directly with that
+    role's session (`request` with its storage state); both must be refused.
+- Assert **business values**, not presence: read the starting value first (stock on hand, balance,
+  count), act, then assert the exact new value computed from the inputs. Check the downstream screen or
+  API the case names (dashboard, ledger, report), not only the form.
+- Dirty paths are real actions: double-click Save (`dblclick`), submit twice, go back and resubmit, two
+  pages on the same record, bad input typed as a user would. Assert there's no duplicate and no half-written record.
 - Every test ends with an assertion on the business outcome (an order exists, a total is right, an error
   message is shown), not only that a page loaded. Use `toMatchAriaSnapshot` for regions where structure
   matters.
 - No `waitForTimeout`, `page.pause()`, `test.only`, hard-coded credentials or production URLs.
-- Create test data through the API (`request` fixture) where possible instead of clicking through setup.
+- Create test data through the API (`request` fixture) where possible instead of clicking through setup,
+  with unique names per run so repeats and parallel workers don't collide.
 
 ## 3. Verify
 
@@ -49,7 +63,9 @@ npx playwright test <testDir>/<area>/<feature-slug>.spec.ts --repeat-each=3
 ```
 
 Fix lint findings. A test that fails because the app doesn't do what the case says is not a test problem:
-mark it `test.fixme()` with the reason and list it in the PR as a possible bug. Don't weaken the assertion.
+mark it `test.fixme()` with the reason, list it in the PR as a possible bug, and draft a `qa:gate-4`
+issue with the business impact ("supplier charged twice when approve is double-clicked"). Don't weaken
+the assertion. Dirty-path cases are where these show up; that is the point of them.
 
 ## 4. Open the PR (Gate 2)
 

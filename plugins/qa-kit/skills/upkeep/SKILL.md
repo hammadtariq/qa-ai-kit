@@ -24,8 +24,10 @@ disable-model-invocation: true
    - **Duplicates**: one case id used by more than one test.
    - **Quarantined and fixme**: each with its open issue, and how long it has been there.
    - **Drafts waiting for Gate 1**: count by section and the oldest date.
+   - **Business risks without a test**: each "must never go wrong" rule and each past incident in
+     `.qa/business-context.md` that no automated case protects yet.
 
-4. Propose the next batch: up to 10 P1/P2 cases to automate this week, grouped by feature, so the team
+4. Propose the next batch: up to 10 P1/P2 cases to automate this week, uncovered business risks first, grouped by feature, so the team
    can run `/qa-kit:generate-tests` per feature. Flag quarantined tests older than 14 days for deletion or a fix.
 
 Keep the report under one screen per section. Tell the user where it is and the three most important findings.

@@ -92,6 +92,10 @@ comes from this plugin, so it does not need to be in `.mcp.json`. If `init-agent
 - `<folder>/auth.setup.ts`: open the login page, find the real field labels and submit button, and update
   the locators (`getByRole` / `getByLabel`). Credentials stay `process.env.QA_USER_EMAIL` / `QA_USER_PASSWORD`.
 - `CLAUDE.md` QA block: replace `ROLE_LIST`, `AREA_LIST` and `TEST_DATA_NOTES` with real values.
+- `.qa/business-context.md`: fill it from the repo's product docs and domain models, thinking as the owner
+  of this kind of business: niche, users, what must never go wrong (money, stock, access, data), rules
+  that hold across features, how real users actually behave, past incidents. Ask the user to confirm the
+  "must never go wrong" list. Every plan and bug severity is judged against this file.
 - `.qa/config.json` → `testrail`: set `projectId` (from `$ARGUMENTS` or ask) and `suiteId` for
   multi-suite projects. Then call `testrail_status` and `testrail_get_meta`:
   - Field names come from `testrail_get_meta` (`system_name`), **not** from the TestRail admin screen.

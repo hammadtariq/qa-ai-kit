@@ -54,6 +54,9 @@ When unsure between drift and bug, choose **Unclear**. A wrong "drift" call hide
 One issue per bug, `gh issue create --label qa:gate-4,bug`:
 
 - Title: what's wrong, in user terms ("Checkout total ignores the 10% coupon").
+- Severity from business impact, using `.qa/business-context.md`: **critical** if it breaks a "must never
+  go wrong" rule (money, stock, access, data), **major** if a common flow is wrong but recoverable,
+  **minor** otherwise. Put it first in the body with one line on what the owner loses.
 - Body: steps to reproduce (from the test), expected vs actual, case id, environment (`BASE_URL`, browser),
   CI run link (`$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`), and the trace artifact name.
 - Add "Drafted by QA Kit. A QA engineer must reproduce this before it goes to the client."

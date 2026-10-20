@@ -4,6 +4,21 @@
 
 Pilot: a mature Next.js + Postgres app (pnpm, antd 6, Jest, no staging environment).
 
+### Business-first test design
+- New playbook `skills/plan-feature/test-design.md`: a case exists only to protect something the business
+  owner would lose. Acceptance criteria are the required business behaviour, **verified against the
+  implementation** (gaps become cases or open questions, never expected results), with a catalogue of
+  realistic dirty paths (bad input, state and permission abuse via UI and API, cross-feature integrity,
+  repeats, dates and money, recovery) and "no junk" rules: one case per business outcome, journeys with
+  checkpoints, data tables instead of one case per field, 8–15 cases per feature.
+- New per-project `.qa/business-context.md`: the niche, users, what must never go wrong, invariants,
+  real-world usage and past incidents. `setup-project` fills it; every plan and bug severity uses it.
+- `plan-feature` loads the context, reads the implementation for gaps, prunes and merges before anything
+  reaches TestRail, adds a "Why it matters" line to each case, and reports a risk → case table at Gate 1.
+- `generate-tests` keeps the shape: one test per case, `test.step` per journey checkpoint, data-table
+  loops, before/after business values, permission checks through UI and API, real double-submits.
+- `triage` sets bug severity from business impact.
+
 ### Setup and templates
 - Test folder defaults to `e2e/` (`--test-dir=<folder>` to change); every path in the templates follows it.
   `tests/` collided with Jest/Vitest default patterns.
