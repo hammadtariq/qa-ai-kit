@@ -3,7 +3,7 @@
     "qa-ai-kit": {
       "source": {
         "source": "github",
-        "repo": "YOUR_GITHUB_ORG/qa-ai-kit"
+        "repo": "hammadtariq/qa-ai-kit"
       }
     }
   },

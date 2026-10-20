@@ -1,10 +1,10 @@
-# QA Kit: nightly full regression at 01:00 Asia/Karachi (20:00 UTC), so Claude's triage
-# finishes before the workday and the subscription's 5-hour window has reset by morning.
+# QA Kit: nightly full regression at 01:00 Asia/Karachi (20:00 UTC), so Claude's triage finishes
+# before the workday and the subscription's 5-hour window has reset by morning.
 name: QA - nightly regression
 
 on:
   schedule:
-    - cron: '0 20 * * *'
+    - cron: "0 20 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -17,8 +17,6 @@ permissions:
 env:
   CI: true
   BASE_URL: ${{ vars.BASE_URL }}
-  QA_USER_EMAIL: ${{ secrets.QA_USER_EMAIL }}
-  QA_USER_PASSWORD: ${{ secrets.QA_USER_PASSWORD }}
 
 jobs:
   regression:
@@ -28,6 +26,17 @@ jobs:
       failed: ${{ steps.result.outputs.failed }}
       quarantine: ${{ steps.flaky.outputs.quarantine }}
       run_title: ${{ steps.title.outputs.title }}
+    # QA-KIT: local-app mode with a database? Uncomment (and match .qa/app-setup.sh).
+    # services:
+    #   postgres:
+    #     image: postgres:16
+    #     env:
+    #       POSTGRES_USER: postgres
+    #       POSTGRES_PASSWORD: postgres
+    #     ports:
+    #       - 5432:5432
+    #     options: >-
+    #       --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       TESTRAIL_URL: ${{ secrets.TESTRAIL_URL }}
       TESTRAIL_USER: ${{ secrets.TESTRAIL_USER }}
@@ -35,13 +44,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/qa-app-setup
         with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-      - run: npx playwright install --with-deps
+          qa-user-email: ${{ secrets.QA_USER_EMAIL }}
+          qa-user-password: ${{ secrets.QA_USER_PASSWORD }}
+          browsers: chromium
 
       - name: Run title
         id: title
@@ -79,6 +86,8 @@ jobs:
           TESTRAIL_PROJECT_NAME: ${{ vars.TESTRAIL_PROJECT_NAME }}
         run: |
           [ -f reports/junit.xml ] || { echo "No JUnit report"; exit 0; }
+          # trcli refuses to create a run when no test is linked to a case, and fails the step.
+          grep -qs 'name="test_id"' reports/junit.xml || { echo "No tests are linked to TestRail cases yet (tr('C123')); skipping upload."; exit 0; }
           pip install --quiet trcli
           SUITE=$(node -p "(require('./.qa/config.json').testrail||{}).suiteId||''")
           trcli -n -h "$TESTRAIL_URL" -u "$TESTRAIL_USER" -k "$TESTRAIL_API_KEY" \
@@ -104,22 +113,22 @@ jobs:
     needs: regression
     if: always() && (needs.regression.outputs.failed == 'true' || needs.regression.outputs.quarantine == 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: write
       pull-requests: write
       issues: write
+    # QA-KIT: same services block as the regression job, if you uncommented it there.
     env:
-      QA_LOCK_ASSERTIONS: '1'
+      QA_LOCK_ASSERTIONS: "1"
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - uses: ./.github/actions/qa-app-setup
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
+          qa-user-email: ${{ secrets.QA_USER_EMAIL }}
+          qa-user-password: ${{ secrets.QA_USER_PASSWORD }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -134,7 +143,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
-          plugin_marketplaces: ${{ secrets.QA_KIT_REPO_URL }}
+          # Public kit: the default URL works. Private kit: set QA_KIT_REPO_URL to a token URL.
+          plugin_marketplaces: ${{ secrets.QA_KIT_REPO_URL || 'https://github.com/hammadtariq/qa-ai-kit.git' }}
           plugins: qa-kit@qa-ai-kit
           prompt: /qa-kit:triage nightly
           claude_args: |

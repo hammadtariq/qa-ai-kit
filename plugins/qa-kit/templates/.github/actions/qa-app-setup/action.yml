@@ -1,0 +1,71 @@
+name: QA app setup
+description: >
+  QA Kit: install dependencies with the repo's package manager (npm, pnpm or Yarn, from the lockfile)
+  and Node version (.nvmrc, else package.json engines, else 22), export the test login, run the repo's
+  .qa/app-setup.sh (database, seed, build in local-app mode) and install Playwright's browser.
+
+inputs:
+  qa-user-email:
+    description: Test account email (secret). .qa/app-setup.sh may override it, e.g. with a per-run account.
+    default: ""
+  qa-user-password:
+    description: Test account password (secret)
+    default: ""
+  browsers:
+    description: Playwright browsers to install
+    default: chromium
+
+runs:
+  using: composite
+  steps:
+    - name: Detect package manager and Node version
+      id: detect
+      shell: bash
+      run: |
+        if [ -f pnpm-lock.yaml ]; then pm=pnpm
+        elif [ -f yarn.lock ]; then pm=yarn
+        else pm=npm; fi
+        if [ -f .nvmrc ]; then node=$(tr -d 'v \n' < .nvmrc)
+        else node=$(node -p "((require('./package.json').engines||{}).node||'22').replace(/[^0-9.x]/g,'').split('.')[0] || '22'" 2>/dev/null || echo 22); fi
+        echo "pm=$pm" >> "$GITHUB_OUTPUT"
+        echo "node=${node:-22}" >> "$GITHUB_OUTPUT"
+        echo "Package manager: $pm, Node: ${node:-22}"
+
+    - name: Install pnpm
+      if: steps.detect.outputs.pm == 'pnpm'
+      shell: bash
+      run: |
+        if node -e "process.exit(require('./package.json').packageManager ? 0 : 1)"; then corepack enable
+        else npm install -g pnpm@10 --silent; fi
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ steps.detect.outputs.node }}
+        cache: ${{ steps.detect.outputs.pm }}
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        case "${{ steps.detect.outputs.pm }}" in
+          pnpm) pnpm install --frozen-lockfile ;;
+          yarn) if [ -f .yarnrc.yml ]; then corepack enable && yarn install --immutable; else yarn install --frozen-lockfile; fi ;;
+          *) npm ci ;;
+        esac
+
+    - name: Test login
+      shell: bash
+      env:
+        EMAIL: ${{ inputs.qa-user-email }}
+        PASSWORD: ${{ inputs.qa-user-password }}
+      run: |
+        if [ -n "$EMAIL" ]; then echo "QA_USER_EMAIL=$EMAIL" >> "$GITHUB_ENV"; fi
+        if [ -n "$PASSWORD" ]; then echo "::add-mask::$PASSWORD"; echo "QA_USER_PASSWORD=$PASSWORD" >> "$GITHUB_ENV"; fi
+
+    - name: Prepare the app (.qa/app-setup.sh)
+      shell: bash
+      run: |
+        if [ -f .qa/app-setup.sh ]; then bash .qa/app-setup.sh; else echo "No .qa/app-setup.sh"; fi
+
+    - name: Install Playwright browser
+      shell: bash
+      run: npx playwright install --with-deps ${{ inputs.browsers }}

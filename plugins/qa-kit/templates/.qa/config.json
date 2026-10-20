@@ -1,7 +1,13 @@
 {
   "name": "CLIENT_PROJECT_NAME",
-  "kitVersion": "0.1.0",
-  "testDir": "tests",
+  "kitVersion": "0.2.0",
+  "testDir": "e2e",
+  "app": {
+    "startCommand": null,
+    "devCommand": null,
+    "port": null,
+    "readyPath": "/"
+  },
   "testrail": {
     "projectId": 0,
     "suiteId": null,
