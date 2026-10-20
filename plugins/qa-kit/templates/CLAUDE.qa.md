@@ -1,20 +1,21 @@
-# CLIENT_PROJECT_NAME
+## QA conventions (QA Kit, Playwright E2E)
 
-<!-- /qa-kit:setup-project fills the placeholders. Keep this file short: it loads into every session. -->
-
-## QA conventions
-
-This repo uses the agency QA Kit: Playwright test agents write and heal tests, TestRail is the
-system of record, and people review at five gates. Follow these rules in every session.
+This repo uses the agency QA Kit: Playwright test agents write and heal end-to-end tests, TestRail is
+the system of record, and people review at five gates. Follow these rules in every session.
 
 ### App under test
-- Staging URL comes from `BASE_URL`. Never point tests at production.
-- Test user: `QA_USER_EMAIL` / `QA_USER_PASSWORD` (seeded staging account). Never hard-code credentials.
+
+- Never point tests at production. `BASE_URL` set = a staging URL; unset = Playwright starts this
+  checkout using `app` in `.qa/config.json`.
+- Test user: `QA_USER_EMAIL` / `QA_USER_PASSWORD` (a seeded test account). Never hard-code credentials.
 - Roles: ROLE_LIST
 - Main areas: AREA_LIST
+- Test data: TEST_DATA_NOTES
 
 ### Writing tests
-- Tests live in `tests/<area>/<feature>.spec.ts`. Import `test`, `expect` and `tr` from `tests/fixtures.ts`.
+
+- Tests live in `e2e/<area>/<feature>.spec.ts`. Import `test`, `expect` and `tr` from `e2e/fixtures.ts`.
+  `e2e/seed.spec.ts` is the seed for the planner and generator agents.
 - Every test links to its TestRail case: `test('title', { annotation: tr('C1234') }, async ({ page }) => { ... })`.
   Results reach TestRail only through this annotation. Don't put the case id in the title.
 - P1 cases get `tag: '@smoke'`. Flaky tests under investigation get `'@quarantine'` (skipped in CI).
@@ -25,7 +26,15 @@ system of record, and people review at five gates. Follow these rules in every s
 - Seed data through the API (`request` fixture) rather than long UI setup.
 - Check your work with `node .qa/scripts/lint-specs.mjs <files>` and run new tests with `--repeat-each=3`.
 
+### Agents driving the live browser (planner, generator, healer)
+
+- If clicking an `option` or `listbox` item from the snapshot times out, it is usually a hidden
+  accessibility copy (component libraries render these). Don't retry the click: click the field, type
+  enough of the option's text to make it unique, and press Enter (ArrowDown + Enter for the next one).
+- Dropdown lists are often virtual (only ~10 rows rendered): type to reach anything further down.
+
 ### What needs a person (the gates)
+
 1. New TestRail cases stay "AI draft" until the QA lead approves them. Never approve cases yourself.
 2. New or changed specs go through a PR labelled `qa:gate-2`.
 3. Never change an assertion's matcher or expected value to make a test pass. If behaviour changed,
@@ -34,5 +43,6 @@ system of record, and people review at five gates. Follow these rules in every s
 5. Release sign-off is the QA lead's call.
 
 ### Commands
+
 - `npx playwright test` · `npx playwright test --grep @smoke` · `npx playwright show-report reports/html`
 - Kit skills: `/qa-kit:plan-feature`, `/qa-kit:generate-tests`, `/qa-kit:triage`, `/qa-kit:digest`, `/qa-kit:upkeep`, `/qa-kit:client-report`

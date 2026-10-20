@@ -9,6 +9,9 @@ disable-model-invocation: true
 
 Input: `$ARGUMENTS`
 
+`<testDir>` below is `testDir` from `.qa/config.json` (default `e2e`). Read the QA conventions in
+`CLAUDE.md` first, including any UI-library helpers under `<testDir>/support/`.
+
 ## 1. Pick the cases
 
 - Section id: `testrail_get_cases` with that `section_id`.
@@ -17,12 +20,12 @@ Input: `$ARGUMENTS`
 
 Keep only cases whose `review` is `approved` (when a review field is configured) and that are not already
 automated. Find existing tests for these ids with
-`grep -rn "tr('C" tests/` so you don't write a second test for the same case. If nothing is left, say so and stop.
+`grep -rn "tr(\"C\|tr('C" <testDir>/` so you don't write a second test for the same case. If nothing is left, say so and stop.
 
 ## 2. Generate
 
 Create a branch `qa/tests-<feature-slug>`. Use the **playwright-test-generator** agent, one spec file per
-feature, at `tests/<area>/<feature-slug>.spec.ts`. Give it the plan file, the case details and these rules,
+feature, at `<testDir>/<area>/<feature-slug>.spec.ts`. Give it the plan file, the case details and these rules,
 which match `CLAUDE.md`:
 
 - Import `test` and `expect` from `../fixtures` (adjust the path), never from `@playwright/test` directly.
@@ -30,6 +33,8 @@ which match `CLAUDE.md`:
   This annotation is how results reach TestRail. Don't put the id in the title.
 - P1 cases also get `tag: '@smoke'`.
 - Locators: `getByRole`, `getByLabel`, `getByText`, then `getByTestId`. No CSS chains or XPath.
+  Use the helpers in `<testDir>/support/` for component-library widgets (for example `antSelect` for
+  Ant Design selects) instead of raw clicks on dropdown options.
 - Every test ends with an assertion on the business outcome (an order exists, a total is right, an error
   message is shown), not only that a page loaded. Use `toMatchAriaSnapshot` for regions where structure
   matters.
@@ -39,8 +44,8 @@ which match `CLAUDE.md`:
 ## 3. Verify
 
 ```bash
-node .qa/scripts/lint-specs.mjs tests/<area>/<feature-slug>.spec.ts
-npx playwright test tests/<area>/<feature-slug>.spec.ts --repeat-each=3
+node .qa/scripts/lint-specs.mjs <testDir>/<area>/<feature-slug>.spec.ts
+npx playwright test <testDir>/<area>/<feature-slug>.spec.ts --repeat-each=3
 ```
 
 Fix lint findings. A test that fails because the app doesn't do what the case says is not a test problem:

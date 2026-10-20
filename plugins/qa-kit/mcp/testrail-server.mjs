@@ -16,7 +16,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-const SERVER_INFO = { name: 'qa-kit-testrail', version: '0.1.0' };
+const SERVER_INFO = { name: 'qa-kit-testrail', version: '0.2.0' };
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 const STATUS = { 1: 'passed', 2: 'blocked', 3: 'untested', 4: 'retest', 5: 'failed' };
 
@@ -127,6 +127,28 @@ async function getAll(cfg, endpoint, key, query = {}, max = 5000) {
   return out.slice(0, max);
 }
 
+// API names of custom case fields are `custom_<system_name>`. On newer instances the system name
+// of a field created as "review_status" is stored as "case_review_status", so the API key is
+// custom_case_review_status. The admin screen shows the short name, which is easy to copy wrongly.
+function checkConfiguredFields(cfg, fields) {
+  const names = new Set(fields.map((f) => f.system_name));
+  const warnings = [];
+  for (const [key, conf] of [['reviewField', cfg.reviewField], ['automatedField', cfg.automatedField]]) {
+    if (!conf) {
+      warnings.push(`${key} is not configured in .qa/config.json.`);
+      continue;
+    }
+    if (names.has(conf.field)) continue;
+    const short = conf.field.replace(/^custom_(case_)?/, '');
+    const guess = [...names].find((n) => n === `custom_case_${short}` || n === `custom_${short}`);
+    warnings.push(
+      `${key}.field "${conf.field}" is not a case field on this instance.` +
+        (guess ? ` Use "${guess}" (from get_case_fields).` : ' Check testrail_get_meta for the system_name.')
+    );
+  }
+  return warnings;
+}
+
 const caseId = (v) => Number(String(v).replace(/^C/i, ''));
 const suiteQuery = (cfg) => (cfg.suiteId ? { suite_id: cfg.suiteId } : {});
 
@@ -191,7 +213,11 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: {} },
     readOnly: true,
     run: async (cfg) => {
-      const p = await api(cfg, 'GET', `get_project/${cfg.projectId}`);
+      const [p, fields] = await Promise.all([
+        api(cfg, 'GET', `get_project/${cfg.projectId}`),
+        api(cfg, 'GET', 'get_case_fields').catch(() => null),
+      ]);
+      const warnings = fields ? checkConfiguredFields(cfg, fields) : ['Could not read get_case_fields to verify field names.'];
       return {
         connected: true,
         url: cfg.url,
@@ -199,6 +225,7 @@ const TOOLS = [
         suiteId: cfg.suiteId,
         reviewField: cfg.reviewField ? cfg.reviewField.field : 'not configured',
         automatedField: cfg.automatedField ? cfg.automatedField.field : 'not configured',
+        warnings,
         projectUrl: `${cfg.url}/index.php?/projects/overview/${p.id}`,
       };
     },
@@ -328,7 +355,10 @@ const TOOLS = [
     },
     run: async (cfg, a) => {
       const f = { ...(a.fields || {}) };
-      if (cfg.reviewField && f[cfg.reviewField.field] === cfg.reviewField.approved) {
+      // Gate 1: never let the agent approve a case, whatever the review field ends up being called.
+      const approved = cfg.reviewField ? cfg.reviewField.approved : 2;
+      const reviewKeys = Object.keys(f).filter((k) => (cfg.reviewField && k === cfg.reviewField.field) || /review_status$/.test(k));
+      if (reviewKeys.some((k) => f[k] === approved || String(f[k]).toLowerCase() === 'approved')) {
         throw new TestRailError('Refused: approving a case is Gate 1 and must be done by a person in TestRail.');
       }
       const c = await api(cfg, 'POST', `update_case/${caseId(a.case_id)}`, { body: f });

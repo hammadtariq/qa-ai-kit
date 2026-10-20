@@ -1,42 +1,72 @@
-import { defineConfig, devices } from '@playwright/test';
-import path from 'node:path';
+import { defineConfig, devices } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 // Local runs read .env; CI passes the same names as secrets/variables.
-try { process.loadEnvFile?.('.env'); } catch { /* no .env file */ }
+try {
+  process.loadEnvFile?.(".env");
+} catch {
+  /* no .env file */
+}
+
+// The app under test, from .qa/config.json:
+//   - BASE_URL set (staging): test that URL.
+//   - BASE_URL unset and `app.startCommand` set: start this checkout on `app.port` and test it
+//     (`app.devCommand` locally if given, `app.startCommand` in CI). Never point BASE_URL at production.
+type QaApp = { startCommand?: string; devCommand?: string; port?: number; readyPath?: string };
+let app: QaApp = {};
+try {
+  app = JSON.parse(readFileSync(".qa/config.json", "utf8")).app ?? {};
+} catch {
+  /* no .qa/config.json yet */
+}
+const localUrl = app.port ? `http://127.0.0.1:${app.port}` : undefined;
+const baseURL = process.env.BASE_URL || localUrl;
 
 // QA_REPORT_DIR lets CI keep two runs apart (PR: changed tests + smoke).
-const reportDir = process.env.QA_REPORT_DIR || 'reports';
+const reportDir = process.env.QA_REPORT_DIR || "reports";
 
 export default defineConfig({
-  testDir: './tests',
-  outputDir: path.join(reportDir, 'artifacts'),
+  testDir: "./e2e",
+  outputDir: path.join(reportDir, "artifacts"),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   // Retry failures at the end, one by one, so a dirty retry can't affect clean tests (Playwright 1.62+).
-  retryStrategy: 'isolated',
-  workers: process.env.CI ? 4 : undefined,
+  retryStrategy: "isolated",
+  workers: process.env.CI ? 2 : undefined,
   reporter: [
-    ['list'],
-    ['html', { open: 'never', outputFolder: path.join(reportDir, 'html') }],
+    ["list"],
+    ["html", { open: "never", outputFolder: path.join(reportDir, "html") }],
     // Claude's triage and the digest read this file.
-    ['json', { outputFile: path.join(reportDir, 'results.json') }],
+    ["json", { outputFile: path.join(reportDir, "results.json") }],
     // trcli reads this. tr('C123') annotations become <property name="test_id">, matched with --case-matcher property.
-    ['junit', { outputFile: path.join(reportDir, 'junit.xml'), embedAnnotationsAsProperties: true }],
+    ["junit", { outputFile: path.join(reportDir, "junit.xml"), embedAnnotationsAsProperties: true }],
   ],
   use: {
-    baseURL: process.env.BASE_URL,
-    testIdAttribute: 'data-testid',
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    baseURL,
+    testIdAttribute: "data-testid",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
   },
+  webServer:
+    process.env.BASE_URL || !app.startCommand || !localUrl
+      ? undefined
+      : {
+          command: process.env.CI ? app.startCommand : app.devCommand || app.startCommand,
+          url: `${localUrl}${app.readyPath ?? "/"}`,
+          reuseExistingServer: !process.env.CI,
+          timeout: 180_000,
+          stdout: "ignore",
+          stderr: "pipe",
+        },
   projects: [
-    { name: 'setup', testMatch: /.*\.setup\.ts/ },
+    { name: "setup", testMatch: /.*\.setup\.ts/ },
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'], storageState: 'playwright/.auth/user.json' },
-      dependencies: ['setup'],
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], storageState: "playwright/.auth/user.json" },
+      dependencies: ["setup"],
     },
     // Add firefox / webkit / mobile projects per client contract, with the same storageState and dependency.
   ],
