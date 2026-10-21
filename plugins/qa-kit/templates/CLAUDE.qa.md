@@ -22,6 +22,10 @@ the system of record, and people review at five gates. Follow these rules in eve
   integrity across features, repeats, dates and money, recovery), not just the happy path.
 - No junk: one case per business outcome, journeys with checkpoints over fragments, data tables over
   one-case-per-field. Playbook: `/qa-kit:plan-feature` follows `skills/plan-feature/test-design.md` in the kit.
+- **Cases live in `specs/cases/<feature>.csv`, one row per case** (format: `specs/cases/README.md`). Edit the
+  CSV, never the generated block in `specs/<feature>.md`; regenerate it with
+  `node .qa/scripts/cases.mjs plan <csv>` and validate with `node .qa/scripts/cases.mjs check <csv>`.
+  The reviewer's `decision` column is Gate 1; only `Keep` rows reach TestRail, through `/qa-kit:push-cases`.
 
 ### Writing tests
 
@@ -46,7 +50,8 @@ the system of record, and people review at five gates. Follow these rules in eve
 
 ### What needs a person (the gates)
 
-1. New TestRail cases stay "AI draft" until the QA lead approves them. Never approve cases yourself.
+1. Cases are reviewed in the cases CSV (`decision` column, filled by a person, never by Claude) before they
+   are pushed. Pushed cases stay "AI draft" in TestRail until the QA lead approves them. Never approve cases yourself.
 2. New or changed specs go through a PR labelled `qa:gate-2`.
 3. Never change an assertion's matcher or expected value to make a test pass. If behaviour changed,
    mark the test `test.fixme()` with a reason and open a `qa:gate-3` issue.
@@ -56,4 +61,4 @@ the system of record, and people review at five gates. Follow these rules in eve
 ### Commands
 
 - `npx playwright test` · `npx playwright test --grep @smoke` · `npx playwright show-report reports/html`
-- Kit skills: `/qa-kit:plan-feature`, `/qa-kit:review-cases`, `/qa-kit:generate-tests`, `/qa-kit:triage`, `/qa-kit:digest`, `/qa-kit:upkeep`, `/qa-kit:client-report`
+- Kit skills: `/qa-kit:plan-feature`, `/qa-kit:review-cases`, `/qa-kit:push-cases`, `/qa-kit:generate-tests`, `/qa-kit:triage`, `/qa-kit:digest`, `/qa-kit:upkeep`, `/qa-kit:client-report`

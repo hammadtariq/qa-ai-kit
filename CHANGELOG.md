@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.0 (2026-10-21): review cases in a CSV before they reach TestRail
+
+From the pilot: cases went to TestRail first and were judged afterwards, so every merge or drop meant
+editing approved cases (60 → 22 → 24 for one feature). Now the whole set is judged in a spreadsheet first.
+
+- **Cases CSV, one row per case** (`specs/cases/<feature>.csv`): the source of truth for case design.
+  Columns include `key` (a repo-owned id like `PO-07`), `testrail_id`, `risks` (ranks from the business
+  context), `why_it_matters`, numbered `steps`/`expected`, a `data` table, `known_issue`, Claude's
+  `suggestion` and the reviewer's `decision`. Format reference installed as `specs/cases/README.md`.
+- **`.qa/scripts/cases.mjs`** (no dependencies): `check` (validation and business-risk coverage; `--push`
+  also requires every row decided), `plan` (regenerates the plan's scenario block between markers),
+  `payload` (TestRail-ready text for the push), `testrail` (TestRail CSV-import file, one row per step),
+  `from-plan` (converts an existing Markdown plan), `set` (edits one row's cells). Files saved from Excel,
+  Google Sheets or LibreOffice read back unchanged (BOM, CRLF and multi-line cells handled).
+- **New skill `/qa-kit:push-cases`**: pushes Keep rows (creates new cases, updates changed ones, which go
+  back to AI draft), moves Drop and Merge rows that are in TestRail to a Retired section, writes the ids back
+  into the CSV, and shows the plan before changing anything. Still no approving and no deleting.
+- **`plan-feature`** writes the CSV and stops for the sheet review instead of creating TestRail cases.
+- **`review-cases`** reviews the CSV (or exports a TestRail section to one first) and writes its verdicts to
+  `suggestion`; the reviewer's `decision` stays the reviewer's.
+- **`generate-tests`** takes the CSV: Keep rows with a TestRail id, steps, data rows and known-issue reasons.
+- The CSV imports into other test management tools directly; TestRail is one destination, not a dependency.
+
+Upgrading from 0.3.0: `/plugin marketplace update qa-ai-kit`, then copy `templates/.qa/scripts/cases.mjs`,
+`templates/.qa/scripts/lib/csv.mjs` and `templates/specs/cases/README.md` into the repo, and add the "Cases
+live in specs/cases" line to the QA block in `CLAUDE.md`. (Re-running `install-templates.mjs` adds the new
+files too, but it also replaces the QA block in `CLAUDE.md` with the template's, so copy by hand if you've
+edited that block.) Convert an existing plan with `node .qa/scripts/cases.mjs from-plan`.
+
 ## 0.3.0 (2026-10-21): review and consolidate existing cases
 
 From the pilot: the first regression plan for one feature came out at 60 cases, mostly sound but split
