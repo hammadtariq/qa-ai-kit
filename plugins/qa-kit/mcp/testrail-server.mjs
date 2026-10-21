@@ -5,8 +5,8 @@
 //
 // Scope and guardrails:
 //   - One TestRail project per repo, read from .qa/config.json (or env).
-//   - No delete tools at all.
-//   - New cases are marked "AI draft" when a review field is configured, and this
+//   - No delete tools at all; retired cases are moved to a section instead.
+//   - New and rewritten cases are marked "AI draft" when a review field is configured, and this
 //     server refuses to set that field to "approved": approval is a human gate.
 //
 // Credentials come from the environment (TESTRAIL_URL, TESTRAIL_USER,
@@ -16,7 +16,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-const SERVER_INFO = { name: 'qa-kit-testrail', version: '0.2.0' };
+const SERVER_INFO = { name: 'qa-kit-testrail', version: '0.3.0' };
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 const STATUS = { 1: 'passed', 2: 'blocked', 3: 'untested', 4: 'retest', 5: 'failed' };
 
@@ -169,6 +169,22 @@ function compactCase(cfg, c) {
   return out;
 }
 
+// Case content for reviews: preconditions and steps, without the rest of the custom fields.
+function detailedCase(cfg, c) {
+  const out = compactCase(cfg, c);
+  out.preconditions = c.custom_preconds || null;
+  if (Array.isArray(c.custom_steps_separated) && c.custom_steps_separated.length) {
+    out.steps = c.custom_steps_separated.map((s) => ({ content: s.content || '', expected: s.expected || '' }));
+  } else if (c.custom_steps || c.custom_expected) {
+    out.steps_text = c.custom_steps || '';
+    out.expected_text = c.custom_expected || '';
+  }
+  return out;
+}
+
+// Fields that change what a case says. Rewriting any of them sends the case back to Gate 1.
+const CONTENT_KEYS = ['title', 'custom_preconds', 'custom_steps_separated', 'custom_steps', 'custom_expected'];
+
 function buildCaseBody(cfg, input) {
   const body = { title: input.title };
   if (input.priority_id) body.priority_id = input.priority_id;
@@ -291,13 +307,14 @@ const TOOLS = [
   },
   {
     name: 'testrail_get_cases',
-    description: 'List cases (compact) in the project, optionally in one section or filtered by title text. Shows review state and automation flag when configured.',
+    description: 'List cases (compact) in the project, optionally in one section or filtered by title text. Shows review state and automation flag when configured. details: true adds preconditions and steps (for reviewing a section in one call).',
     inputSchema: {
       type: 'object',
       properties: {
         section_id: { type: 'integer' },
         filter: { type: 'string', description: 'Title contains this text' },
         priority_id: { type: 'string', description: 'Comma-separated priority ids' },
+        details: { type: 'boolean', description: 'Include preconditions and steps' },
       },
     },
     readOnly: true,
@@ -308,7 +325,8 @@ const TOOLS = [
         filter: a.filter,
         priority_id: a.priority_id,
       });
-      return { count: cases.length, cases: cases.map((c) => compactCase(cfg, c)) };
+      const shape = a.details ? detailedCase : compactCase;
+      return { count: cases.length, cases: cases.map((c) => shape(cfg, c)) };
     },
   },
   {
@@ -344,25 +362,55 @@ const TOOLS = [
   },
   {
     name: 'testrail_update_case',
-    description: 'Update fields on a case (title, priority_id, refs, custom_* fields). Cannot approve cases: approval is a human gate.',
+    description: 'Update a case: title, preconditions, steps, priority_id, refs or custom_* fields. Rewriting the title, preconditions or steps sends the case back to AI draft for Gate 1. Cannot approve cases: approval is a human gate.',
     inputSchema: {
       type: 'object',
       properties: {
         case_id: { type: ['string', 'integer'] },
-        fields: { type: 'object', description: 'Fields to change, by API name' },
+        title: { type: 'string' },
+        preconditions: { type: 'string', description: 'Replaces the preconditions' },
+        steps: { type: 'array', items: stepSchema, description: 'Replaces all separated steps' },
+        fields: { type: 'object', description: 'Other fields to change, by API name' },
       },
-      required: ['case_id', 'fields'],
+      required: ['case_id'],
     },
     run: async (cfg, a) => {
       const f = { ...(a.fields || {}) };
+      if (a.title) f.title = a.title;
+      if (a.preconditions !== undefined) f.custom_preconds = a.preconditions;
+      if (Array.isArray(a.steps)) f.custom_steps_separated = a.steps.map((s) => ({ content: s.content || '', expected: s.expected || '' }));
+      if (!Object.keys(f).length) throw new TestRailError('Nothing to update: pass title, preconditions, steps or fields.');
       // Gate 1: never let the agent approve a case, whatever the review field ends up being called.
       const approved = cfg.reviewField ? cfg.reviewField.approved : 2;
       const reviewKeys = Object.keys(f).filter((k) => (cfg.reviewField && k === cfg.reviewField.field) || /review_status$/.test(k));
       if (reviewKeys.some((k) => f[k] === approved || String(f[k]).toLowerCase() === 'approved')) {
         throw new TestRailError('Refused: approving a case is Gate 1 and must be done by a person in TestRail.');
       }
+      // An approved case that Claude rewrites is a new draft: a person reviews it again.
+      const rewritten = Object.keys(f).some((k) => CONTENT_KEYS.includes(k));
+      if (rewritten && cfg.reviewField) f[cfg.reviewField.field] = cfg.reviewField.draft;
       const c = await api(cfg, 'POST', `update_case/${caseId(a.case_id)}`, { body: f });
-      return compactCase(cfg, c);
+      const out = compactCase(cfg, c);
+      if (rewritten && cfg.reviewField) out.note = 'Content changed: set back to AI draft for Gate 1.';
+      return out;
+    },
+  },
+  {
+    name: 'testrail_move_cases',
+    description: 'Move cases to another section of the same suite, keeping their ids, history and results. Use to retire merged or dropped cases into a "Retired" section instead of deleting them.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        section_id: { type: 'integer', description: 'Target section' },
+        case_ids: { type: 'array', items: { type: ['string', 'integer'] }, minItems: 1, maxItems: 250 },
+      },
+      required: ['section_id', 'case_ids'],
+    },
+    run: async (cfg, a) => {
+      const suiteId = cfg.suiteId || (await api(cfg, 'GET', `get_section/${a.section_id}`)).suite_id;
+      const ids = a.case_ids.map(caseId);
+      await api(cfg, 'POST', `move_cases_to_section/${a.section_id}`, { body: { suite_id: suiteId, case_ids: ids } });
+      return { moved: ids.map((i) => `C${i}`), section_id: a.section_id };
     },
   },
   {

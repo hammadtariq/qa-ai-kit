@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0 (2026-10-21): review and consolidate existing cases
+
+From the pilot: the first regression plan for one feature came out at 60 cases, mostly sound but split
+into fragments (one case per field, per role action, per revision type). The owner's review merged them
+into 22 business cases.
+
+- New skill `/qa-kit:review-cases <section or plan>`: reads a TestRail section with steps, judges every
+  case against `.qa/business-context.md` and the playbook (keep / merge / rewrite / retire), picks the
+  surviving id (automated first, then priority), keeps known-bug cases separate, lists uncovered risks and
+  the specs affected, and writes `reports/case-review-<section>-<date>.md`. Read-only until the user
+  confirms what to apply.
+- TestRail server 0.3.0:
+  - `testrail_get_cases` takes `details: true` to return preconditions and steps for a whole section in
+    one call.
+  - `testrail_update_case` takes `title`, `preconditions` and `steps` directly. Rewriting any of them sets
+    the case back to **AI draft**, so an approved case Claude changes goes through Gate 1 again.
+  - New `testrail_move_cases`: moves cases to another section (a "Retired" section) keeping ids, history
+    and results. There are still no delete tools.
+- `plan-feature` suggests `review-cases` when the existing section it builds on is bloated.
+
+Upgrading from 0.2.0: `/plugin marketplace update qa-ai-kit`. Nothing changes in client repos; optionally
+add `/qa-kit:review-cases` to the commands line of the QA block in `CLAUDE.md`.
+
 ## 0.2.0 (2026-10-20): lessons from the first pilot
 
 Pilot: a mature Next.js + Postgres app (pnpm, antd 6, Jest, no staging environment).

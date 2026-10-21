@@ -18,7 +18,7 @@ story ──▶ /qa-kit:plan-feature ──▶ TestRail cases (AI draft) ──�
 plugins/qa-kit/
   .claude-plugin/plugin.json         plugin "qa-kit"
   .mcp.json                          TestRail MCP server (bundled, zero dependencies)
-  mcp/testrail-server.mjs            project-scoped; can't approve cases or delete anything
+  mcp/testrail-server.mjs            project-scoped; can't approve cases or delete anything (retires by moving)
   hooks/hooks.json                   guard hooks on Write/Edit/MultiEdit
   scripts/guard-secrets.mjs          blocks keys and tokens in committed files
   scripts/guard-assertions.mjs       asks locally / denies in CI when a test's assertions change
@@ -36,6 +36,7 @@ docs/AGENCY-SETUP.md                 one-time TestRail, GitHub and Claude accoun
 | --- | --- | --- |
 | `/qa-kit:setup-project [testrail-project-id]` | Onboarding a client repo | – |
 | `/qa-kit:plan-feature <ticket or brief>` | Story ready for QA, or regression coverage for an existing feature | Gate 1: approve cases in TestRail |
+| `/qa-kit:review-cases <section or plan>` | A section feels too big, an inherited suite, or before Gate 1 | Gate 1 again for rewritten cases |
 | `/qa-kit:generate-tests <section, plan or case ids>` | After Gate 1 | Gate 2: review the spec PR |
 | `/qa-kit:triage nightly \| pr <n>` | CI after failures, or locally | Gates 3 and 4 |
 | `/qa-kit:digest` | Anytime: what's waiting for review | – |

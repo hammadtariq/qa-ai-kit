@@ -44,7 +44,8 @@ one comment with `gh issue comment`; otherwise give them to the user. Do not gue
 
 Call `testrail_status` (its `warnings` must be empty; fix `.qa/config.json` first if not), then
 `testrail_get_sections` and `testrail_get_cases` for the closest section. Note existing cases that
-already cover parts of this feature; the new set adds to them, it doesn't repeat them.
+already cover parts of this feature; the new set adds to them, it doesn't repeat them. If the existing
+section is itself bloated or repetitive, suggest `/qa-kit:review-cases` for it first.
 
 ## 3. Explore and write the plan
 
