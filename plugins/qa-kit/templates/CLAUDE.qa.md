@@ -56,4 +56,4 @@ the system of record, and people review at five gates. Follow these rules in eve
 ### Commands
 
 - `npx playwright test` · `npx playwright test --grep @smoke` · `npx playwright show-report reports/html`
-- Kit skills: `/qa-kit:plan-feature`, `/qa-kit:generate-tests`, `/qa-kit:triage`, `/qa-kit:digest`, `/qa-kit:upkeep`, `/qa-kit:client-report`
+- Kit skills: `/qa-kit:plan-feature`, `/qa-kit:review-cases`, `/qa-kit:generate-tests`, `/qa-kit:triage`, `/qa-kit:digest`, `/qa-kit:upkeep`, `/qa-kit:client-report`
