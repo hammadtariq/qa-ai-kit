@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.1 (2026-10-21): pushes match what TestRail holds
+
+From aligning the pilot's CSV with TestRail after its first push:
+
+- `cases.mjs payload` / `testrail` send preconditions as **setup + "Why it matters:"** only. `known_issue`,
+  `notes`, `risks`, `source` and `key` stay in the repo (CSV, plan, `test.fixme()` reasons). Before, every
+  push added those lines, so a CSV copied from TestRail looked changed on every row.
+- Data tables in step 1 include the Markdown separator row, so TestRail renders them as tables (and matches
+  tables written there by hand).
+- The plan generator escapes `*` (and a `_` right before it) outside code spans: Prettier was rewriting
+  `DEMO_EDITOR_*` into italics. `from-plan` removes the escapes again.
+- `from-plan` keeps text as written (it no longer capitalises the first word).
+- `specs/cases/README.md` lists which columns reach TestRail.
+
 ## 0.4.0 (2026-10-21): review cases in a CSV before they reach TestRail
 
 From the pilot: cases went to TestRail first and were judged afterwards, so every merge or drop meant
