@@ -1,6 +1,6 @@
 ---
 name: plan-feature
-description: Turn a story, ticket or feature brief into business-first test cases - explored in the live app, checked against the implementation, with realistic dirty paths and no junk - as AI-draft TestRail cases for QA lead approval (Gate 1). Use when a story reaches Ready for QA, when adding regression coverage to an existing feature, or when the user asks to plan or write test cases for a feature.
+description: Turn a story, ticket or feature brief into business-first test cases - explored in the live app, checked against the implementation, with realistic dirty paths and no junk - written to a cases CSV (one row per case) for the reviewer to judge in a spreadsheet before anything reaches TestRail (Gate 1). Use when a story reaches Ready for QA, when adding regression coverage to an existing feature, or when the user asks to plan or write test cases for a feature.
 argument-hint: "<ticket id, issue URL, brief file (specs/briefs/x.md) or short feature description>"
 disable-model-invocation: true
 ---
@@ -42,8 +42,9 @@ one comment with `gh issue comment`; otherwise give them to the user. Do not gue
 
 ## 2. Avoid duplicates
 
-Call `testrail_status` (its `warnings` must be empty; fix `.qa/config.json` first if not), then
-`testrail_get_sections` and `testrail_get_cases` for the closest section. Note existing cases that
+Read any existing `specs/cases/*.csv` for this area. If TestRail is configured, also call `testrail_status`
+(its `warnings` must be empty; fix `.qa/config.json` first if not), then `testrail_get_sections` and
+`testrail_get_cases` for the closest section. Note existing cases that
 already cover parts of this feature; the new set adds to them, it doesn't repeat them. If the existing
 section is itself bloated or repetitive, suggest `/qa-kit:review-cases` for it first.
 
@@ -66,41 +67,54 @@ Use the **playwright-test-planner** agent. Give it:
   notes in CLAUDE.md. If clicking a dropdown option times out, it's a hidden accessibility copy: type the
   option's text in the field and press Enter instead of retrying the click.
 
-## 4. Prune to a strong set
+## 4. Write the cases CSV
 
-Apply the playbook's "No junk" rules to the plan before anything reaches TestRail:
+The cases live in `specs/cases/<feature-slug>.csv`, one row per case (format: `specs/cases/README.md`).
+Nothing goes to TestRail yet: the reviewer judges the whole set in a spreadsheet first.
 
-- merge per-field validation into one case with a data table, and per-role checks of one action into one case;
-- turn fragments of one business chain into a journey case with checkpoints;
+```bash
+node .qa/scripts/cases.mjs from-plan specs/<feature-slug>.md specs/cases/<feature-slug>.csv --prefix=<KEY>
+```
+
+`<KEY>` is a short feature prefix (`PO` for purchase orders). Then, per row, fill what the planner can't
+know: `risks` (ranks from the business context), `type`, and `known_issue` for rows that look wrong in the
+code (with the open question it depends on). Use
+`node .qa/scripts/cases.mjs set <csv> <KEY> <column>=<value>` or edit the file. Leave `testrail_id` and
+`decision` empty; set `suggestion` to `Keep`.
+
+## 5. Prune to a strong set
+
+Apply the playbook's "No junk" rules in the CSV before handing it over:
+
+- merge per-field validation into one row with a `data` table, and per-role checks of one action into one row;
+- turn fragments of one business chain into a journey row with a checkpoint per step;
 - drop page-loads, button-exists and duplicate cases, and anything that can't realistically fail;
-- aim for 8–15 cases; every case beyond that must name a risk the others don't cover;
-- give each surviving case a business-impact priority (P1 money/stock/access/data loss in a common flow,
-  P2 wrong but recoverable or rare, P3 cosmetic).
+- keep a known-bug case in its own row so its failure doesn't hide the healthy checks;
+- aim for 8-15 rows; every row beyond that must name a risk the others don't cover;
+- priority from business impact (P1 money/stock/access/data loss in a common flow, P2 wrong but
+  recoverable or rare, P3 cosmetic).
 
-Update `specs/<feature-slug>.md` to match, with a short "Merged / dropped" list at the end.
+Merged and dropped candidates are simply not written (they were never pushed). Then:
 
-## 5. Create the TestRail cases
+```bash
+node .qa/scripts/cases.mjs check specs/cases/<feature-slug>.csv   # no errors; read the risk coverage
+node .qa/scripts/cases.mjs plan  specs/cases/<feature-slug>.csv   # regenerates the plan's scenarios
+```
 
-- Create or reuse a section named after the feature (`testrail_add_section`, under the area's parent section
-  if there is one).
-- Call `testrail_get_meta` once to map P1/P2/P3 to `priority_id` and pick `type_id` (Functional for
-  behaviour, Security for permission/tenant cases, Regression for journeys guarding existing behaviour).
-- Create all cases in **one** `testrail_add_cases` call:
-  - title = the business behaviour in the owner's words;
-  - `preconditions` = data and role, then a line `Why it matters: <business risk>`;
-  - separated steps with a checkable expected result each, including downstream screens and concrete values;
-  - data tables (inputs → expected result) inside the step text when one case checks several inputs;
-  - `refs` = the ticket id, if any.
-- Write the case id next to each scenario in `specs/<feature-slug>.md`, like `**TestRail:** C1234`.
+Keep the hand-written parts of `specs/<feature-slug>.md` (overview, key facts, known risks, what's left
+out) above the generated block, and a short "Merged / dropped" list at the end.
 
-## 6. Report for Gate 1
+## 6. Hand over for review (Gate 1, in the sheet)
 
 Tell the user, briefly:
 
-1. a **risk → case** table (which business risks are covered, by which cases, at what priority);
+1. a **risk → case** table (from `check`'s coverage, with priorities);
 2. risks **not** covered and why;
 3. cases merged or dropped, one line each;
 4. open questions, including anything in the implementation that looked wrong;
-5. the TestRail review link from the tool result.
+5. the next step: open `specs/cases/<feature-slug>.csv`, fill the `decision` column (`Keep`, `Rewrite`,
+   `Drop`, `Merge into <key>`; fill-down `Keep` and change the exceptions), save as CSV, then run
+   `/qa-kit:push-cases specs/cases/<feature-slug>.csv`. `/qa-kit:review-cases` can give a second opinion first.
 
-The cases stay "AI draft" until the QA lead approves them in TestRail. Then run `/qa-kit:generate-tests`.
+Commit the CSV and the plan on a branch (`qa/cases-<feature-slug>`) and open a PR if the repo uses them, so
+the review is visible. Don't push to TestRail from this skill.

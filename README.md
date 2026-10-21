@@ -4,7 +4,8 @@ A Claude Code plugin marketplace that packages the agency QA pipeline: Claude pl
 triages Playwright tests; TestRail stays the system of record; people review at five gates.
 
 ```
-story ──▶ /qa-kit:plan-feature ──▶ TestRail cases (AI draft) ──▶ Gate 1: QA lead approves
+story ──▶ /qa-kit:plan-feature ──▶ cases CSV (one row per case) ──▶ Gate 1: reviewer decides in the sheet
+      ──▶ /qa-kit:push-cases ──▶ TestRail (AI draft) ──▶ QA lead bulk-approves
       ──▶ /qa-kit:generate-tests ──▶ spec PR ──▶ Gate 2: QA engineer reviews
       ──▶ CI: PR smoke + nightly regression ──▶ trcli ──▶ TestRail runs
       ──▶ failures ──▶ /qa-kit:triage (headless) ──▶ healer PR | Gate 3 escalation | Gate 4 bug draft
@@ -35,8 +36,9 @@ docs/AGENCY-SETUP.md                 one-time TestRail, GitHub and Claude accoun
 | Command | When | Human gate it feeds |
 | --- | --- | --- |
 | `/qa-kit:setup-project [testrail-project-id]` | Onboarding a client repo | – |
-| `/qa-kit:plan-feature <ticket or brief>` | Story ready for QA, or regression coverage for an existing feature | Gate 1: approve cases in TestRail |
-| `/qa-kit:review-cases <section or plan>` | A section feels too big, an inherited suite, or before Gate 1 | Gate 1 again for rewritten cases |
+| `/qa-kit:plan-feature <ticket or brief>` | Story ready for QA, or regression coverage for an existing feature | Gate 1: review the cases CSV |
+| `/qa-kit:push-cases <cases CSV>` | After the sheet review | Bulk-approve the AI drafts in TestRail |
+| `/qa-kit:review-cases <cases CSV or section>` | A feature's cases feel too many, an inherited suite, or a second opinion before Gate 1 | Gate 1: decide on its suggestions |
 | `/qa-kit:generate-tests <section, plan or case ids>` | After Gate 1 | Gate 2: review the spec PR |
 | `/qa-kit:triage nightly \| pr <n>` | CI after failures, or locally | Gates 3 and 4 |
 | `/qa-kit:digest` | Anytime: what's waiting for review | – |
@@ -55,6 +57,11 @@ what must never go wrong (money, stock, access, data) and how real users behave;
 - **no junk**: one case per business outcome, journeys with checkpoints, data tables instead of a case per
   field, about 8–15 strong cases per feature, each with a "Why it matters" line.
 
+Cases are written to **`specs/cases/<feature>.csv`, one row per case**, and reviewed in any spreadsheet
+before anything reaches TestRail. The CSV is the source of truth for case design: the plan's scenarios and
+the exports are generated from it (`.qa/scripts/cases.mjs`), and it imports into other test management
+tools as well, so the agency isn't tied to TestRail. Format: `templates/specs/cases/README.md`.
+
 ## What a client repo gets
 
 - `playwright.config.ts`: JSON + JUnit reporters, isolated retries, storage-state login, and a
@@ -62,7 +69,8 @@ what must never go wrong (money, stock, access, data) and how real users behave;
 - `e2e/` (or the folder you choose): `fixtures.ts` with the `tr('C123')` helper, `auth.setup.ts`,
   `seed.spec.ts`, and `support/antd.ts` for Ant Design apps.
 - A QA conventions block appended to `CLAUDE.md`; the plugin and permissions merged into `.claude/settings.json`.
-- `.qa/business-context.md` (the owner's view of the product), `.qa/config.json`, `.qa/app-setup.sh` (CI app prep: database, seed, build), `.qa/scripts/` (lint,
+- `specs/cases/README.md`: the cases CSV format, for reviewers.
+- `.qa/business-context.md` (the owner's view of the product), `.qa/config.json`, `.qa/app-setup.sh` (CI app prep: database, seed, build), `.qa/scripts/` (cases CSV, lint,
   failure extraction, flaky history, Slack digest, id collection), `qa.env.example`.
 - `.github/actions/qa-app-setup` (npm, pnpm or Yarn and the right Node version, detected) and two workflows:
   - **qa-pr.yml**: lint specs, run changed tests and `@smoke`, upload to TestRail, and on failure Claude

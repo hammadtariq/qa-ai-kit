@@ -1,7 +1,7 @@
 ---
 name: generate-tests
 description: Write Playwright specs for TestRail cases the QA lead has approved, run them, and open a spec PR for review (Gate 2). Use after Gate 1 approval, or when the user asks to automate cases.
-argument-hint: "<TestRail section id, plan file in specs/, or case ids like C12 C13>"
+argument-hint: "<cases CSV (specs/cases/x.csv), TestRail section id, plan file in specs/, or case ids like C12 C13>"
 disable-model-invocation: true
 ---
 
@@ -14,6 +14,10 @@ Input: `$ARGUMENTS`
 
 ## 1. Pick the cases
 
+- Cases CSV (`specs/cases/<feature>.csv`, preferred): rows with `decision` = `Keep` and a `testrail_id`.
+  The row has everything the test needs: `steps`/`expected` (one `test.step` each), `data` (loop over its
+  rows), `known_issue` (the `test.fixme()` reason), `file` (where the test goes) and `priority`. Rows without
+  a `testrail_id` haven't been pushed: run `/qa-kit:push-cases` first.
 - Section id: `testrail_get_cases` with that `section_id`.
 - Plan file: read the `**TestRail:** C…` ids from it.
 - Case ids: `testrail_get_case` for each.
