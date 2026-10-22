@@ -69,10 +69,13 @@ It prints JSON with `created`, `merged`, `skipped` and `detected` (package manag
 cp .mcp.json .mcp.json.qa-backup 2>/dev/null || true
 npx playwright init-agents --loop=claude
 [ -f .mcp.json.qa-backup ] && node "${CLAUDE_PLUGIN_ROOT}/scripts/merge-mcp.mjs" .mcp.json.qa-backup .mcp.json
-node "${CLAUDE_PLUGIN_ROOT}/scripts/patch-healer.mjs"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/patch-agents.mjs"
 ```
 
-`init-agents` replaces `.mcp.json`; the merge puts back any servers the repo had. The TestRail server
+`init-agents` replaces `.mcp.json` and the agent files; the merge puts back any servers the repo had, and
+`patch-agents.mjs` adds the agency rules to the healer, planner and generator and runs `playwright-test`
+through `.qa/scripts/mcp-guard.mjs` (per-tool time limits, so a stuck browser action errors instead of
+hanging). Re-run both after every `init-agents`. The TestRail server
 comes from this plugin, so it does not need to be in `.mcp.json`. If `init-agents` wrote its own
 `seed.spec.ts` next to the template's `<folder>/seed.spec.ts`, keep the template one and delete the other.
 

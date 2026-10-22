@@ -51,9 +51,16 @@ section is itself bloated or repetitive, suggest `/qa-kit:review-cases` for it f
 ## 3. Explore and write the plan
 
 Make sure the app is reachable first: `BASE_URL`, or the local dev server from `app.devCommand` in
-`.qa/config.json` (start it in a separate terminal so the agent doesn't wait on a cold compile).
+`.qa/config.json` (start it in a separate terminal so the agent doesn't wait on a cold compile). Load
+`app.readyPath` once with `curl` until it answers, so the first page compile happens before the agent starts.
 
-Use the **playwright-test-planner** agent. Give it:
+Check that the browser agents are guarded: `.mcp.json` runs `playwright-test` through
+`.qa/scripts/mcp-guard.mjs` and the planner agent has the "When the browser gets stuck" block. If not, run
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/patch-agents.mjs"` (copy `mcp-guard.mjs` from the kit's templates first if
+it's missing) and ask the user to restart Claude Code so the MCP server restarts behind the guard.
+
+Use the **playwright-test-planner** agent, **one business-risk group per run** (three or four scenarios),
+so a run that gets stuck loses little. Give it:
 
 - the business context's "What must never go wrong" list and the feature's rules, verbatim
 - the implementation gaps you found in step 1
@@ -65,7 +72,33 @@ Use the **playwright-test-planner** agent. Give it:
   owner would look at; record concrete values (amounts, quantities, statuses) for expected results; skip
   anything existing cases already cover and any open question until the QA lead answers it; follow the UI
   notes in CLAUDE.md. If clicking a dropdown option times out, it's a hidden accessibility copy: type the
-  option's text in the field and press Enter instead of retrying the click.
+  option's text in the field and press Enter instead of retrying the click. Two attempts per step; anything
+  still blocked goes under `## Not explored` with what was tried, and the agent moves on.
+
+**Don't wait on a stuck agent.** Every browser action is limited to about 45 seconds by the guard, so the
+agent gets an error and tries another way instead of hanging. If the planner runs in the background, start
+the watchdog next to it as a background command:
+
+```bash
+node .qa/scripts/mcp-guard.mjs --watch --stale=120
+```
+
+It exits with a `STUCK:` line when a browser call has been open, or nothing has happened, for 2 minutes. When
+it fires: stop the planner (TaskStop, or ask the user to press Esc), read the end of
+`.qa-cache/mcp-guard.log` to see where it stopped, and ask the user (below). When the planner finishes first,
+stop the watchdog.
+
+**Ask instead of guessing.** After each run, collect the scenarios under "Not explored", plus the one a
+stuck run was on, and ask the user with AskUserQuestion, one question per blocked scenario (up to four at a
+time). Options:
+
+- **Give a hint**: the user says how to get past the step (which control, which data); re-run just that
+  scenario with the hint.
+- **I'll explore it**: the user checks it by hand and tells you the outcome; write the scenario from that.
+- **Skip for now**: list it under "Left out of this plan" with the reason.
+- **Retry**: only if the cause looked temporary (app restarted, data fixed).
+
+If setup failed ("app not reachable"), ask the user to start the app before anything else.
 
 ## 4. Write the cases CSV
 
