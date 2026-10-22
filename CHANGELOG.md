@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.5.0 (2026-10-22): browser agents don't hang
+
+From the pilot: `plan-feature`'s planner sometimes sat for minutes on one browser action until someone
+stopped it by hand. Cause, in Playwright 1.64's test MCP server: the agent drives a page paused at the end of
+the seed test, pausing sets the page's default timeout to 0, and the browser tools pass no timeout of their
+own, so a click on an element that never becomes clickable (antd's hidden 0x0 option copies, an element
+under an overlay) waits forever. Claude Code's `MCP_TOOL_TIMEOUT` is per server, so it would also cut off
+the slow calls that are fine (`planner_setup_page`, `test_run`).
+
+- **`.qa/scripts/mcp-guard.mjs`** wraps the `playwright-test` MCP server with per-tool time limits
+  (`agents.toolTimeouts` in `.qa/config.json`; defaults: browser actions 45 s, navigation 90 s, page setup
+  5 min, test runs unlimited). A call over its limit is answered with an error that tells the agent how to
+  recover, the late reply is dropped, and the page stays usable. Every call is logged to
+  `.qa-cache/mcp-guard.log`. Checked against the real server: a click on a hidden option ends at the limit
+  and the next click and evaluate on the same page succeed; without the guard the same click was still
+  waiting at 75 s.
+- **`mcp-guard.mjs --watch --stale=120`**: a watchdog to run next to a background agent. It exits with a
+  `STUCK:` line when a browser call has been open, or nothing has happened, for that long, which wakes the
+  main session.
+- **`scripts/patch-agents.mjs`** replaces `patch-healer.mjs` (kept as an alias): healer rules as before, a
+  "When the browser gets stuck" block for the planner and generator (never retry the same ref, two attempts
+  per step, then `## Not explored` and move on; stop on setup failure), and it puts the guard in front of
+  `playwright-test` in `.mcp.json`. Re-run after every `init-agents`.
+- **`plan-feature`**: warms the app first, runs the planner one risk group at a time, starts the watchdog for
+  background runs, and asks the user about each blocked scenario (hint, explore by hand, skip, retry).
+  `generate-tests` does the same for the generator.
+
+Upgrading from 0.4.x: `/plugin marketplace update qa-ai-kit`, copy `templates/.qa/scripts/mcp-guard.mjs` into
+the repo's `.qa/scripts/`, run `node <kit>/plugins/qa-kit/scripts/patch-agents.mjs`, optionally add the
+`agents` block to `.qa/config.json`, and restart Claude Code so the MCP server starts behind the guard.
+
 ## 0.4.1 (2026-10-21): pushes match what TestRail holds
 
 From aligning the pilot's CSV with TestRail after its first push:

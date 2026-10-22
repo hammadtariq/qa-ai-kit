@@ -28,7 +28,13 @@ automated. Find existing tests for these ids with
 
 ## 2. Generate
 
-Create a branch `qa/tests-<feature-slug>`. Use the **playwright-test-generator** agent, one spec file per
+Create a branch `qa/tests-<feature-slug>`. The generator drives the same guarded browser as the planner:
+check `.mcp.json` runs `playwright-test` through `.qa/scripts/mcp-guard.mjs` (`plan-feature` step 3), and if it
+runs in the background, start `node .qa/scripts/mcp-guard.mjs --watch --stale=120` next to it. Cases it
+reports under "Not explored", or that a stuck run was on, go to the user with AskUserQuestion (hint, explore
+by hand, skip, retry) instead of being retried blindly.
+
+Use the **playwright-test-generator** agent, one spec file per
 feature, at `<testDir>/<area>/<feature-slug>.spec.ts`. Give it the plan file, the case details and these rules,
 which match `CLAUDE.md`:
 

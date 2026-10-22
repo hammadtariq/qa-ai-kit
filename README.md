@@ -24,6 +24,7 @@ plugins/qa-kit/
   scripts/guard-secrets.mjs          blocks keys and tokens in committed files
   scripts/guard-assertions.mjs       asks locally / denies in CI when a test's assertions change
   scripts/install-templates.mjs      installs templates: merges settings, appends CLAUDE.md, picks test folder
+  scripts/patch-agents.mjs           agency rules for the Playwright agents; puts mcp-guard in front of their MCP server
   scripts/                           other setup helpers (.mcp.json merge, healer rules)
   skills/                            the slash commands below
   templates/                         what setup-project copies into a client repo
@@ -70,6 +71,8 @@ tools as well, so the agency isn't tied to TestRail. Format: `templates/specs/ca
   `seed.spec.ts`, and `support/antd.ts` for Ant Design apps.
 - A QA conventions block appended to `CLAUDE.md`; the plugin and permissions merged into `.claude/settings.json`.
 - `specs/cases/README.md`: the cases CSV format, for reviewers.
+- `.qa/scripts/mcp-guard.mjs`: per-tool time limits for the Playwright agents' browser, plus a `--watch` watchdog,
+  so a stuck browser action errors (and the agent tries another way) instead of hanging.
 - `.qa/business-context.md` (the owner's view of the product), `.qa/config.json`, `.qa/app-setup.sh` (CI app prep: database, seed, build), `.qa/scripts/` (cases CSV, lint,
   failure extraction, flaky history, Slack digest, id collection), `qa.env.example`.
 - `.github/actions/qa-app-setup` (npm, pnpm or Yarn and the right Node version, detected) and two workflows:

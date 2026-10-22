@@ -47,6 +47,10 @@ the system of record, and people review at five gates. Follow these rules in eve
   accessibility copy (component libraries render these). Don't retry the click: click the field, type
   enough of the option's text to make it unique, and press Enter (ArrowDown + Enter for the next one).
 - Dropdown lists are often virtual (only ~10 rows rendered): type to reach anything further down.
+- Browser actions have time limits (`.qa/scripts/mcp-guard.mjs`, set in `.qa/config.json` `agents.toolTimeouts`).
+  An error starting "QA Kit guard:" means the action would never have finished: never retry the same ref.
+  Two attempts per step, then record it under "Not explored" and move on. `.qa-cache/mcp-guard.log` shows
+  every browser call and how long it took.
 
 ### What needs a person (the gates)
 

@@ -1,6 +1,6 @@
 {
   "name": "CLIENT_PROJECT_NAME",
-  "kitVersion": "0.4.1",
+  "kitVersion": "0.5.0",
   "testDir": "e2e",
   "app": {
     "startCommand": null,
@@ -14,6 +14,15 @@
     "templateId": null,
     "reviewField": null,
     "automatedField": null
+  },
+  "agents": {
+    "toolTimeouts": {
+      "browser_*": 45000,
+      "browser_navigate*": 90000,
+      "browser_wait_for": 60000,
+      "*_setup_page": 300000,
+      "test_*": 0
+    }
   },
   "triage": {
     "maxFailures": 15,
