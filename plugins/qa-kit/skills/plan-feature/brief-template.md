@@ -2,6 +2,8 @@
 
 Roles: <which logins, e.g. ADMIN admin@example.test, EDITOR editor@example.test>. Test data: <seed / org>.
 
+Area and risk tier: <area from .qa/business-context.md, low | medium | high>
+
 Why it matters: <what the business owner loses if this breaks: money, stock, access, trust, compliance>
 
 Acceptance criteria (required business behaviour; verify against the implementation, not just the happy path):
@@ -17,7 +19,15 @@ Business rules and invariants:
 Dirty paths to cover (from the playbook catalogue, each with its business reason):
 - <e.g. approve twice: must not double the stock or the ledger charge>
 
-Open questions for the QA lead:
-- <Anything the code or docs leave unclear, or that looks wrong in the implementation. Don't turn a suspicious behaviour into an expected one.>
+## Decisions
+
+Answers from the owner to questions the ticket and code left open. Later sessions read these instead of asking again.
+
+| Question | Answer | Who | Date |
+| --- | --- | --- | --- |
+| <e.g. The API allows approving your own purchase. Should it?> | <No, never> | <owner name> | <YYYY-MM-DD> |
+
+Open questions for the owner:
+- <Anything still unanswered, or that looks wrong in the implementation. Don't turn a suspicious behaviour into an expected one.>
 
 Out of scope: <related features covered separately>

@@ -95,10 +95,9 @@ comes from this plugin, so it does not need to be in `.mcp.json`. If `init-agent
 - `<folder>/auth.setup.ts`: open the login page, find the real field labels and submit button, and update
   the locators (`getByRole` / `getByLabel`). Credentials stay `process.env.QA_USER_EMAIL` / `QA_USER_PASSWORD`.
 - `CLAUDE.md` QA block: replace `ROLE_LIST`, `AREA_LIST` and `TEST_DATA_NOTES` with real values.
-- `.qa/business-context.md`: fill it from the repo's product docs and domain models, thinking as the owner
-  of this kind of business: niche, users, what must never go wrong (money, stock, access, data), rules
-  that hold across features, how real users actually behave, past incidents. Ask the user to confirm the
-  "must never go wrong" list. Every plan and bug severity is judged against this file.
+- `.qa/business-context.md` and `.qa/glossary.md`: installed as templates. They are filled by
+  `/qa-kit:discover`, an interview with the product owner, at the end of setup (step 9). Don't fill them
+  from guesses here; every plan and bug severity is judged against them.
 - `.qa/config.json` → `testrail`: set `projectId` (from `$ARGUMENTS` or ask) and `suiteId` for
   multi-suite projects. Then call `testrail_status` and `testrail_get_meta`:
   - Field names come from `testrail_get_meta` (`system_name`), **not** from the TestRail admin screen.
@@ -138,3 +137,13 @@ and approve pull requests" (for healer PRs), and create the labels
 Remind the user to confirm the client's contract allows AI tooling on their app before the first run.
 The first test results reach TestRail only once a test carries a `tr('C…')` annotation; until then the
 upload step skips.
+
+## 9. Business context
+
+Ask the user (AskUserQuestion) whether they can answer for the business now:
+
+- **Yes, I'm the owner (or speak for them):** run `/qa-kit:discover`. It reads the repo, then asks 10-20
+  multiple-choice questions and writes `.qa/business-context.md` and `.qa/glossary.md`. Commit them on the
+  setup branch.
+- **No, someone else is:** tell them to have the product owner run `/qa-kit:discover` in this repo before
+  the first `/qa-kit:plan-feature`. It can be re-run any time, and asks only about gaps.

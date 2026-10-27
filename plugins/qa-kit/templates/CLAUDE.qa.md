@@ -14,14 +14,20 @@ the system of record, and people review at five gates. Follow these rules in eve
 
 ### Designing test cases
 
-- Think like the owner of this business: read `.qa/business-context.md` first. A case exists to protect
-  something the owner would lose (money, stock, access, data, trust), and says so in a "Why it matters" line.
+- Think like the owner of this business: read `.qa/business-context.md` and `.qa/glossary.md` first (filled
+  by `/qa-kit:discover`; only facts tagged `(owner, ...)` justify a P1). A case exists to protect something
+  the owner would lose (money, stock, access, data, trust), and says so in a "Why it matters" line.
 - Acceptance criteria are the required business behaviour, verified against the implementation; a gap
   between the two is a case or an open question, never an expected result.
 - Cover the realistic dirty paths (bad input, acting twice or out of order, lower roles via UI and API,
   integrity across features, repeats, dates and money, recovery), not just the happy path.
 - No junk: one case per business outcome, journeys with checkpoints over fragments, data tables over
   one-case-per-field. Playbook: `/qa-kit:plan-feature` follows `skills/plan-feature/test-design.md` in the kit.
+- **Each case is a short Gherkin scenario in the business's words** (`scenario` column): Given where it
+  starts, When the person does one business action, Then what a person can see (a number, a status, a
+  quoted message, who can see what). 3-7 lines, glossary terms, no click / button / field / page /
+  endpoint / status code; technical hints go in `notes`. A journey has at most 4 When/Then pairs.
+  `cases.mjs check` enforces this. Rules and good / bad examples: the playbook, sections 5-7.
 - **Cases live in `specs/cases/<feature>.csv`, one row per case** (format: `specs/cases/README.md`). Edit the
   CSV, never the generated block in `specs/<feature>.md`; regenerate it with
   `node .qa/scripts/cases.mjs plan <csv>` and validate with `node .qa/scripts/cases.mjs check <csv>`.
@@ -65,4 +71,4 @@ the system of record, and people review at five gates. Follow these rules in eve
 ### Commands
 
 - `npx playwright test` · `npx playwright test --grep @smoke` · `npx playwright show-report reports/html`
-- Kit skills: `/qa-kit:plan-feature`, `/qa-kit:review-cases`, `/qa-kit:push-cases`, `/qa-kit:generate-tests`, `/qa-kit:triage`, `/qa-kit:digest`, `/qa-kit:upkeep`, `/qa-kit:client-report`
+- Kit skills: `/qa-kit:discover`, `/qa-kit:plan-feature`, `/qa-kit:review-cases`, `/qa-kit:push-cases`, `/qa-kit:generate-tests`, `/qa-kit:triage`, `/qa-kit:digest`, `/qa-kit:upkeep`, `/qa-kit:client-report`

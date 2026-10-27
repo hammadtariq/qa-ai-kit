@@ -15,9 +15,11 @@ Input: `$ARGUMENTS`
 ## 1. Pick the cases
 
 - Cases CSV (`specs/cases/<feature>.csv`, preferred): rows with `decision` = `Keep` and a `testrail_id`.
-  The row has everything the test needs: `steps`/`expected` (one `test.step` each), `data` (loop over its
-  rows), `known_issue` (the `test.fixme()` reason), `file` (where the test goes) and `priority`. Rows without
-  a `testrail_id` haven't been pushed: run `/qa-kit:push-cases` first.
+  The row has everything the test needs: `background` and `scenario` (Given/When/Then lines; older rows
+  have `preconditions`/`steps`/`expected` instead), `data` (loop over its rows), `notes` (test ids, routes,
+  stubs), `known_issue` (the `test.fixme()` reason), `file` (where the test goes) and `priority`. Rows
+  without a `testrail_id` haven't been pushed: run `/qa-kit:push-cases` first. If the feature has a brief,
+  read its `## Decisions` too.
 - Section id: `testrail_get_cases` with that `section_id`.
 - Plan file: read the `**TestRail:** C…` ids from it.
 - Case ids: `testrail_get_case` for each.
@@ -45,14 +47,24 @@ which match `CLAUDE.md`:
 - Locators: `getByRole`, `getByLabel`, `getByText`, then `getByTestId`. No CSS chains or XPath.
   Use the helpers in `<testDir>/support/` for component-library widgets (for example `antSelect` for
   Ant Design selects) instead of raw clicks on dropdown options.
+- **The scenario's lines name the steps**, so the HTML report reads like the case: Given lines are the
+  setup (API seeding where possible, or one `test.step('Given ...')`), and each When block with its Then
+  block is one step named after the When line:
+  `await test.step('When the manager approves order A-17', async () => { /* act, then assert each Then line */ })`.
+  Each Then line becomes at least one assertion inside that step. For older rows, name steps after the
+  numbered steps instead.
+- **Placeholders come from `data`**: a scenario with `<amount>` and `<message>` loops over the `data` rows,
+  each row in its own step named with the values filled in (`When Omar enters 0 boxes received`).
+- `notes` holds the technical hints (test ids, routes, what to stub); it's guidance, not part of the case.
 - **One TestRail case = one test**, so each case gets one result. Keep the case's shape
   (playbook: `${CLAUDE_PLUGIN_ROOT}/skills/plan-feature/test-design.md`):
-  - journey case → one test with a `test.step()` per checkpoint (create, approve, stock, ledger, report),
-    each ending in its own assertion, so a failure names the step;
+  - journey case (several When/Then pairs) → one test with a `test.step()` per pair, each ending in its
+    own assertion, so a failure names the checkpoint;
   - data-table case → one test that loops over the table rows, each row in its own `test.step()` with
     `expect.soft` where later rows are still worth checking after one fails;
-  - permission case → act as the lower role through the UI **and** call the API directly with that
-    role's session (`request` with its storage state); both must be refused.
+  - permission case ("even a direct request is refused") → act as the lower role through the UI **and**
+    call the API directly with that role's session (`request` with its storage state, details in `notes`);
+    both must be refused.
 - Assert **business values**, not presence: read the starting value first (stock on hand, balance,
   count), act, then assert the exact new value computed from the inputs. Check the downstream screen or
   API the case names (dashboard, ledger, report), not only the form.

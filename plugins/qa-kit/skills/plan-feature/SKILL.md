@@ -15,9 +15,14 @@ Read the QA conventions in `CLAUDE.md` (test folder, logins, UI library notes) a
 
 ## 0. Business context
 
-Read `.qa/business-context.md`. If it is missing or still has placeholders, fill it in first, from the
-repo's product docs (README, PRD, product or strategy notes, CLAUDE.md) and the domain models. Ask the
-user to confirm the "What must never go wrong" list; it drives every P1 case. Keep it to one page.
+Read `.qa/business-context.md` and `.qa/glossary.md`. If the context is missing, still has template
+placeholders, or a "What must never go wrong" item is tagged `(assumed)`, run `/qa-kit:discover` before
+planning (with the area's name, e.g. `/qa-kit:discover disasters`, when only one area has gaps). If the
+owner isn't available, carry on with what's there, but no `(assumed)` fact can justify a P1: such cases are
+P2 until the owner confirms the rule, and the hand-over lists them.
+
+Note the feature's area and its risk tier (low / medium / high) from "Areas and risk tiers"; it goes in the
+brief and decides how many cases the feature gets.
 
 ## 1. Required business behaviour
 
@@ -34,11 +39,24 @@ state the rules, then have the user confirm it before you continue.
 schemas, permission maps, state transitions and side effects (ledger entries, stock movements, emails,
 history). Note every place the code can disagree with the business rule (a check only in the UI, an
 unguarded status change, a side effect not reversed, rounding, a missing tenant filter). Each gap becomes a
-case, and if it already looks wrong, an **Open question**. Never write current behaviour that looks wrong
-as the expected result.
+case, and if it already looks wrong, a question for the owner. Never write current behaviour that looks
+wrong as the expected result.
 
-**Stop if the business rules are unclear.** List the specific questions. For a GitHub issue, post them as
-one comment with `gh issue comment`; otherwise give them to the user. Do not guess business rules.
+**Ask about unclear rules, one at a time.** Before exploring, settle what the ticket and the code leave
+open, in the same style as `/qa-kit:discover`:
+
+- At most about 6 questions, each with AskUserQuestion, one per call. The first option is the answer the
+  code suggests, labelled `(Recommended)`, with the evidence: "The API allows approving your own purchase
+  (src/purchases/approve.ts has no check). Should it?" Options like "No, never", "Yes, that's fine", "Only
+  under a limit".
+- Ask only what changes a case: who may do what, limits and amounts, what happens on repeat or reversal,
+  which downstream record must change. Don't ask what the brief or the business context already answers.
+- Record every answer in the brief under `## Decisions` (question, answer, who answered, date), so later
+  sessions, `review-cases` and `generate-tests` don't ask again. Create the brief from the template if
+  there isn't one.
+
+**No owner in the session** (a GitHub issue picked up in CI, an unattended run): don't guess. Post the
+questions as one comment with `gh issue comment` (or give them to the user) and stop.
 
 ## 2. Avoid duplicates
 
@@ -63,6 +81,7 @@ Use the **playwright-test-planner** agent, **one business-risk group per run** (
 so a run that gets stuck loses little. Give it:
 
 - the business context's "What must never go wrong" list and the feature's rules, verbatim
+- the brief's `## Decisions` and the glossary's terms and example names
 - the implementation gaps you found in step 1
 - the seed test `<testDir>/seed.spec.ts` (`testDir` from `.qa/config.json`)
 - the output file `specs/<feature-slug>.md`
@@ -74,6 +93,13 @@ so a run that gets stuck loses little. Give it:
   notes in CLAUDE.md. If clicking a dropdown option times out, it's a hidden accessibility copy: type the
   option's text in the field and press Enter instead of retrying the click. Two attempts per step; anything
   still blocked goes under `## Not explored` with what was tried, and the agent moves on.
+- **how to write each scenario** (playbook section 5): under its `#### <n>. <title>` heading (title in 12
+  words or fewer, in the business's words), a `**Priority:** P1` line, then a fenced ` ```gherkin ` block of
+  Given/When/Then lines using the glossary's terms and example names: no click, button, field, page,
+  selector or URL in it; Thens with concrete values a person can see; 3-7 lines; a journey has at most 4
+  When/Then pairs. Several inputs for one behaviour: `<placeholders>` in the block and a Markdown table
+  under it whose header names them. Technical findings (test ids, routes, waits, what to stub) go in
+  bullet points under the block; they become the row's `notes`.
 
 **Don't wait on a stuck agent.** Every browser action is limited to about 45 seconds by the guard, so the
 agent gets an error and tries another way instead of hanging. If the planner runs in the background, start
@@ -109,9 +135,14 @@ Nothing goes to TestRail yet: the reviewer judges the whole set in a spreadsheet
 node .qa/scripts/cases.mjs from-plan specs/<feature-slug>.md specs/cases/<feature-slug>.csv --prefix=<KEY>
 ```
 
-`<KEY>` is a short feature prefix (`PO` for purchase orders). Then, per row, fill what the planner can't
-know: `risks` (ranks from the business context), `type`, and `known_issue` for rows that look wrong in the
-code (with the open question it depends on). Use
+`<KEY>` is a short feature prefix (`PO` for purchase orders). Scenarios written as gherkin blocks land in
+the `scenario` column as they are. If the planner wrote numbered steps instead, `from-plan` converts them
+mechanically and marks the row `Rewrite: converted to Given/When/Then, check the wording`: reword those
+scenarios in business terms (playbook section 5) before going on.
+
+Then, per row, fill what the planner can't know: `risks` (ranks from the business context), `type`,
+`why_it_matters`, and `known_issue` for rows that look wrong in the code (with the question it depends on).
+Shared Given lines for a whole section go in each row's `background`. Use
 `node .qa/scripts/cases.mjs set <csv> <KEY> <column>=<value>` or edit the file. Leave `testrail_id` and
 `decision` empty; set `suggestion` to `Keep`.
 
@@ -134,6 +165,11 @@ node .qa/scripts/cases.mjs check specs/cases/<feature-slug>.csv   # no errors; r
 node .qa/scripts/cases.mjs plan  specs/cases/<feature-slug>.csv   # regenerates the plan's scenarios
 ```
 
+`check` also enforces the writing rules: technical words, a Then nobody can see, more than 4 When/Then
+pairs and a scenario that doesn't start with Given are errors; borderline words, long titles and
+scenarios, vague Thens ("correctly") and words missing from the glossary are warnings. Fix every error;
+fix each warning unless the owner's own wording is the reason.
+
 Keep the hand-written parts of `specs/<feature-slug>.md` (overview, key facts, known risks, what's left
 out) above the generated block, and a short "Merged / dropped" list at the end.
 
@@ -144,7 +180,8 @@ Tell the user, briefly:
 1. a **risk → case** table (from `check`'s coverage, with priorities);
 2. risks **not** covered and why;
 3. cases merged or dropped, one line each;
-4. open questions, including anything in the implementation that looked wrong;
+4. the owner's decisions from step 1, open questions (including anything in the implementation that looked
+   wrong), and any case kept at P2 because its rule is still `(assumed)`;
 5. the next step: open `specs/cases/<feature-slug>.csv`, fill the `decision` column (`Keep`, `Rewrite`,
    `Drop`, `Merge into <key>`; fill-down `Keep` and change the exceptions), save as CSV, then run
    `/qa-kit:push-cases specs/cases/<feature-slug>.csv`. `/qa-kit:review-cases` can give a second opinion first.
