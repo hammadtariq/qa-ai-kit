@@ -12,9 +12,10 @@ import { readFileSync } from 'node:fs';
  */
 export type QaRole = { name: string; env: string; authFile: string };
 
-type QaConfig = { roles?: Record<string, { env?: string }> | null; defaultRole?: string | null };
+type QaConfig = { roles?: Record<string, { env?: string }> | null; defaultRole?: string | null; [key: string]: unknown };
 
-function config(): QaConfig {
+/** .qa/config.json, or {} before setup has written it. playwright.config.ts reads `app` from it too. */
+export function qaConfig(): QaConfig {
   try {
     return JSON.parse(readFileSync('.qa/config.json', 'utf8'));
   } catch {
@@ -23,7 +24,7 @@ function config(): QaConfig {
 }
 
 export function qaRoles(): QaRole[] {
-  const configured = config().roles;
+  const configured = qaConfig().roles;
   const roles = configured && Object.keys(configured).length ? configured : { user: { env: 'QA_USER' } };
   return Object.entries(roles).map(([name, r]) => ({
     name,
@@ -41,6 +42,6 @@ export function qaRole(name: string, setting = 'role'): QaRole {
 
 /** The role every test's `page` starts as: `defaultRole` if set (it must be one of the roles), else the first role. */
 export function defaultRole(): QaRole {
-  const name = config().defaultRole;
+  const name = qaConfig().defaultRole;
   return name ? qaRole(name, 'defaultRole') : qaRoles()[0];
 }

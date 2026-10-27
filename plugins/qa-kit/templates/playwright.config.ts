@@ -1,7 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
-import { readFileSync } from "node:fs";
 import path from "node:path";
-import { defaultRole } from "./e2e/roles";
+import { defaultRole, qaConfig } from "./e2e/roles";
 
 // Local runs read .env; CI passes the same names as secrets/variables.
 try {
@@ -15,14 +14,7 @@ try {
 //   - BASE_URL unset and `app.startCommand` set: start this checkout on `app.port` and test it
 //     (`app.devCommand` locally if given, `app.startCommand` in CI). Never point BASE_URL at production.
 type QaApp = { startCommand?: string; devCommand?: string; port?: number; readyPath?: string };
-type QaConfig = { app?: QaApp };
-let qa: QaConfig = {};
-try {
-  qa = JSON.parse(readFileSync(".qa/config.json", "utf8"));
-} catch {
-  /* no .qa/config.json yet */
-}
-const app: QaApp = qa.app ?? {};
+const app = (qaConfig().app ?? {}) as QaApp;
 // The session every test's `page` starts in: `defaultRole`, else the first of `roles`, else "user"
 // (QA_USER_EMAIL / QA_USER_PASSWORD). Throws here if `defaultRole` isn't one of the roles.
 const startRole = defaultRole();

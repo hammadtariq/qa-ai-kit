@@ -82,7 +82,7 @@ comes from this plugin, so it does not need to be in `.mcp.json`. If `init-agent
 ## 6. Fill in the project specifics
 
 - `.env`: you can't read it (project settings deny it, on purpose). Check what's set with
-  `node -e "try{process.loadEnvFile('.env')}catch{};const c=JSON.parse(require('fs').readFileSync('.qa/config.json','utf8'));const r=Object.entries(c.roles||{user:{env:'QA_USER'}}).flatMap(([n,v])=>[(v.env||'QA_'+n.toUpperCase())+'_EMAIL',(v.env||'QA_'+n.toUpperCase())+'_PASSWORD']);for(const k of ['BASE_URL',...r,'TESTRAIL_URL','TESTRAIL_USER','TESTRAIL_API_KEY'])console.log(k, process.env[k]?'set':'MISSING')"`
+  `node -e "try{process.loadEnvFile('.env')}catch{};const c=JSON.parse(require('fs').readFileSync('.qa/config.json','utf8'));const roles=Object.keys(c.roles||{}).length?c.roles:{user:{env:'QA_USER'}};const r=Object.entries(roles).flatMap(([n,v])=>{const e=v?.env||'QA_'+n.toUpperCase().replace(/\\W+/g,'_');return[e+'_EMAIL',e+'_PASSWORD']});for(const k of ['BASE_URL',...r,'TESTRAIL_URL','TESTRAIL_USER','TESTRAIL_API_KEY'])console.log(k, process.env[k]?'set':'MISSING')"`
   and ask the user to fill anything missing from `qa.env.example`. In local-app mode also confirm the
   app's own database variables point at a local database, not production.
 - **Local-app mode:**

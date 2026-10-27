@@ -194,6 +194,19 @@ test("applyScores drops impact 1 whatever the likelihood, unless the owner asked
   assert.equal(by["C-03"], "Merge into C-02");
 });
 
+test("applyScores warns when a Drop, Merge or Rewrite comes without the reviewer's reason", () => {
+  const rows = [row({ key: "D-01" }), row({ key: "D-02" }), row({ key: "D-03", priority: "P1" }), row({ key: "D-04" })];
+  const res = applyScores(rows, [
+    { key: "D-01", impact: 3, likelihood: 2, unique: false, duplicate_of: "D-04", observable: true },
+    { key: "D-02", impact: 2, likelihood: 1, unique: true, observable: true, reason: "needs an unusual input" },
+    { key: "D-03", impact: 2, likelihood: 3, unique: true, observable: true },
+    { key: "D-04", impact: 3, likelihood: 3, unique: true, observable: true },
+  ]);
+  assert.deepEqual(res.errors, []);
+  assert.equal(res.warnings.length, 1);
+  assert.match(res.warnings[0], /^D-01: "Merge into D-04" has no reason/);
+});
+
 test("applyScores rejects unknown keys, bad numbers and bad merge targets", () => {
   const res = applyScores(
     [row({ key: "B-01" })],

@@ -27,7 +27,8 @@ login while permission cases need several.
   `--tier` the medium budget applies. `check` warns on a P1 scored below impact 3.
 - `check` fixes: a `ui` case with a long data table still gets the bad-row error next to the "use api"
   warning; a `data` cell holding only spaces no longer crashes it; a When without a Then no longer adds a
-  warning about an `"undefined"` Then.
+  warning about an `"undefined"` Then. `apply-scores` warns when a Drop, Merge or Rewrite comes without the
+  reviewer's reason, and `plan` creates the plan's folder if it's missing.
 - **One login per role**: `.qa/config.json` → `roles`, e.g. `{ "manager": { "env": "QA_MANAGER" } }`, read
   from `QA_MANAGER_EMAIL` / `QA_MANAGER_PASSWORD`. New `e2e/roles.ts`; `auth.setup.ts` logs in once per role
   and saves `playwright/.auth/<role>.json`; tests start as `defaultRole` (or the first role). New fixtures

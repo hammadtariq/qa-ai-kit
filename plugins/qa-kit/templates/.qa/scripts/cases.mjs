@@ -12,8 +12,9 @@
 //       JSON for /qa-kit:push-cases: rows to create, update and retire, with TestRail-ready text.
 //   node .qa/scripts/cases.mjs testrail <cases.csv> [out.csv]
 //       Export in TestRail's CSV import layout (one row per step). Other tools: see the kit docs.
-//   node .qa/scripts/cases.mjs from-plan <plan.md> [cases.csv] [--prefix=PO] [--legacy]
+//   node .qa/scripts/cases.mjs from-plan <plan.md> [cases.csv] [--prefix=PO] [--legacy] [--force]
 //       One-time conversion of an existing Markdown plan into a cases CSV (Given/When/Then unless --legacy).
+//       --force overwrites an existing CSV.
 //   node .qa/scripts/cases.mjs migrate <cases.csv>
 //       Convert preconditions/steps/expected rows into a Given/When/Then scenario. Ids and decisions stay.
 //   node .qa/scripts/cases.mjs apply-scores <cases.csv> <scores.json>
@@ -27,6 +28,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { readRecords, writeCsv } from "./lib/csv.mjs";
+
+const OUTER_PIPES = /^\||\|$/g; // the leading and trailing | of a Markdown table row
 
 export const COLUMNS = [
   "key",
@@ -117,7 +120,9 @@ export function parseDecision(v) {
   return { kind, target: m[2] ? m[2].toUpperCase() : null, reason: m[3] || "" };
 }
 
-const isLive = (r) => !["drop", "merge"].includes(parseDecision(r.decision).kind);
+const kindOf = (v) => parseDecision(v).kind;
+const RETIRED = ["drop", "merge"]; // decisions that take a case out of the set
+const isLive = (r) => !RETIRED.includes(kindOf(r.decision));
 
 // The ranked "What must never go wrong" list from .qa/business-context.md.
 export function loadRisks(dir = process.cwd()) {
@@ -174,7 +179,7 @@ export function loadGlossary(dir = process.cwd()) {
     if (/^#/.test(line)) inNames = /names/i.test(line);
     if (line.startsWith("|")) {
       const cells = line
-        .replace(/^\||\|$/g, "")
+        .replace(OUTER_PIPES, "")
         .split("|")
         .map((c) => c.trim());
       if (/^term$/i.test(cells[0]) || /^[-: ]+$/.test(cells[0]) || placeholder(cells[0])) continue;
@@ -201,7 +206,7 @@ const KEYWORD = /^(given|when|then|and|but)\b\s*(.*)$/i;
 export function parseScenario(text, background = "") {
   const errors = [];
   const lines = [];
-  const read = (src, where) =>
+  const addLines = (src, where) =>
     (src || "").split("\n").forEach((raw, i) => {
       const t = raw.trim();
       if (!t) return;
@@ -209,8 +214,8 @@ export function parseScenario(text, background = "") {
       if (!m) return errors.push(`${where} line ${i + 1} "${t}" should start with Given, When, Then, And or But`);
       lines.push({ kw: m[1][0].toUpperCase() + m[1].slice(1).toLowerCase(), text: m[2], where });
     });
-  read(background, "background");
-  read(text, "scenario");
+  addLines(background, "background");
+  addLines(text, "scenario");
 
   const given = [];
   const pairs = [];
@@ -287,7 +292,7 @@ export function parseData(text) {
   if (!lines.length) return null;
   const split = (l) =>
     l
-      .replace(/^\||\|$/g, "")
+      .replace(OUTER_PIPES, "")
       .split(" | ")
       .map((c) => c.trim());
   return { header: split(lines[0]), rows: lines.slice(1).map(split) };
@@ -467,6 +472,7 @@ export function checkCases(
   }
 
   const count = (f) => rows.filter(f).length;
+  const kinds = rows.map((r) => kindOf(r.decision));
   const summary = {
     rows: rows.length,
     live: live.length,
@@ -479,12 +485,12 @@ export function checkCases(
     unit: live.filter((r) => levelOf(r) === "unit").length,
     tier,
     budget: budget[tier] ?? null,
-    decided: count((r) => parseDecision(r.decision).kind && parseDecision(r.decision).kind !== "invalid"),
-    keep: count((r) => parseDecision(r.decision).kind === "keep"),
-    rewrite: count((r) => parseDecision(r.decision).kind === "rewrite"),
-    drop: count((r) => parseDecision(r.decision).kind === "drop"),
-    merge: count((r) => parseDecision(r.decision).kind === "merge"),
-    undecided: count((r) => !parseDecision(r.decision).kind),
+    decided: kinds.filter((k) => k && k !== "invalid").length,
+    keep: kinds.filter((k) => k === "keep").length,
+    rewrite: kinds.filter((k) => k === "rewrite").length,
+    drop: kinds.filter((k) => k === "drop").length,
+    merge: kinds.filter((k) => k === "merge").length,
+    undecided: kinds.filter((k) => !k).length,
   };
   return { summary, coverage, errors, warnings };
 }
@@ -535,7 +541,7 @@ export function buildPayload(rows) {
     preconditions: testrailPreconditions(r),
     steps: testrailSteps(r),
   });
-  const kept = rows.filter((r) => parseDecision(r.decision).kind === "keep");
+  const kept = rows.filter((r) => kindOf(r.decision) === "keep");
   const keep = kept.filter((r) => levelOf(r) !== "unit");
   const unit = kept.filter((r) => levelOf(r) === "unit");
   return {
@@ -543,7 +549,7 @@ export function buildPayload(rows) {
     update: keep.filter((r) => r.testrail_id).map(toCase),
     retire: [
       ...rows
-        .filter((r) => r.testrail_id && ["drop", "merge"].includes(parseDecision(r.decision).kind))
+        .filter((r) => r.testrail_id && !isLive(r))
         .map((r) => ({ key: r.key, testrail_id: r.testrail_id, decision: r.decision })),
       // A pushed case moved to unit level leaves TestRail; the developers own it now.
       ...unit
@@ -552,7 +558,7 @@ export function buildPayload(rows) {
     ],
     for_developers: unit.map((r) => ({ key: r.key, title: r.title, why_it_matters: r.why_it_matters || "" })),
     held_back: rows
-      .filter((r) => !["keep", "drop", "merge"].includes(parseDecision(r.decision).kind))
+      .filter((r) => kindOf(r.decision) !== "keep" && isLive(r))
       .map((r) => ({ key: r.key, decision: r.decision || "(not reviewed)" })),
   };
 }
@@ -577,6 +583,11 @@ const md = (t) =>
     .map((part, i) => (i % 2 ? part : part.replace(/(?<!\\)\*/g, "\\*").replace(/_(?=\\\*)/g, "\\_")))
     .join("");
 const unmd = (t) => (t || "").replace(/\\([*_])/g, "$1");
+// Text as written, with the Markdown escapes the plan generator adds removed.
+const unescapeFields = (r, extra = []) => {
+  for (const k of ["title", "why_it_matters", "data", "notes", "known_issue", "source", "section", ...extra])
+    if (r[k]) r[k] = unmd(r[k]);
+};
 
 export function renderScenarios(rows) {
   const out = [];
@@ -684,6 +695,7 @@ export function writePlan(planPath, rows, csvPath) {
       text = text.slice(0, start) + (intro ? `\n${intro.trim()}\n\n` : "\n") + block + "\n\n" + tail;
     }
   }
+  mkdirSync(dirname(planPath), { recursive: true });
   writeFileSync(planPath, text.replace(/\n{3,}/g, "\n\n"));
 }
 
@@ -773,8 +785,7 @@ function caseFromBlock(text, section) {
     }
     if (table.length) r.data = table.join("\n");
     if (notes.length) r.notes = notes.join("\n");
-    for (const k of ["title", "why_it_matters", "data", "notes", "known_issue", "source", "section"])
-      if (r[k]) r[k] = unmd(r[k]);
+    unescapeFields(r);
     return r;
   }
 
@@ -816,27 +827,14 @@ function caseFromBlock(text, section) {
   r.expected = expected.map((s, i) => `${i + 1}. ${s}`).join("\n");
   if (table.length) r.data = table.join("\n");
   if (notes.length) r.notes = notes.join("\n");
-  // Text as written, with the Markdown escapes the plan generator adds removed.
-  for (const k of [
-    "title",
-    "why_it_matters",
-    "preconditions",
-    "steps",
-    "expected",
-    "data",
-    "notes",
-    "known_issue",
-    "source",
-    "section",
-  ])
-    if (r[k]) r[k] = unmd(r[k]);
+  unescapeFields(r, ["preconditions", "steps", "expected"]);
   return r;
 }
 
 // "| a | b\| c |" -> "a | b/c" (the CSV's data-cell layout).
 const tableRow = (t) =>
   t
-    .replace(/^\||\|$/g, "")
+    .replace(OUTER_PIPES, "")
     .split(/(?<!\\)\|/)
     .map((c) => c.trim().replace(/\\\|/g, "/"))
     .join(" | ");
@@ -850,6 +848,7 @@ const tableRow = (t) =>
 // without impact 3.
 export function applyScores(rows, scores) {
   const errors = [];
+  const warnings = [];
   const changes = [];
   const out = rows.map((r) => ({ ...r }));
   const byKey = new Map(out.map((r) => [r.key, r]));
@@ -876,12 +875,15 @@ export function applyScores(rows, scores) {
     else if (r.priority === "P1" && s.impact < 3)
       suggestion = `Rewrite: P1 needs impact 3, scored ${score}; make it P2 or show the bigger loss`;
     r.score = score;
+    // The P1 rule explains itself; the others need the reviewer's words for the owner.
+    if (suggestion && !s.reason && !suggestion.startsWith("Rewrite: P1"))
+      warnings.push(`${s.key}: "${suggestion}" has no reason; ask the reviewer for one or add it to review_notes`);
     if (suggestion) {
       r.suggestion = suggestion;
       changes.push({ key: r.key, score, suggestion });
     } else if (!r.suggestion) r.suggestion = "Keep";
   }
-  return { rows: out, changes, errors };
+  return { rows: out, changes, errors, warnings };
 }
 
 // ---------------------------------------------------------------- migrate
@@ -923,7 +925,7 @@ export function migrateRows(rows) {
 function testrailCsv(rows) {
   const cols = ["ID", "Key", "Section", "Title", "Priority", "Type", "Preconditions", "Step", "Expected Result"];
   const out = [];
-  for (const r of rows.filter((x) => parseDecision(x.decision).kind === "keep" && levelOf(x) !== "unit")) {
+  for (const r of rows.filter((x) => kindOf(x.decision) === "keep" && levelOf(x) !== "unit")) {
     testrailSteps(r).forEach((s, i) => {
       out.push(
         i === 0
@@ -1016,7 +1018,7 @@ function main() {
   }
 
   if (cmd === "from-plan") {
-    if (!args[0]) fail("Usage: cases.mjs from-plan <plan.md> [cases.csv] [--prefix=PO]");
+    if (!args[0]) fail("Usage: cases.mjs from-plan <plan.md> [cases.csv] [--prefix=PO] [--legacy] [--force]");
     const out = args[1] || join("specs", "cases", `${slugOf(args[0])}.csv`);
     if (existsSync(out) && !flags.force) fail(`${out} exists; pass --force to overwrite`);
     const prefix = String(
@@ -1053,6 +1055,7 @@ function main() {
     saveCases(args[0], res.rows, columns);
     console.log(`Scored ${scores.length} rows; ${res.changes.length} suggestions changed:`);
     for (const c of res.changes) console.log(`  ${c.key} ${c.score}: ${c.suggestion}`);
+    for (const w of res.warnings) console.log(`warn   ${w}`);
     return;
   }
 
