@@ -15,6 +15,8 @@ Input: `$ARGUMENTS`
 ## 1. Pick the cases
 
 - Cases CSV (`specs/cases/<feature>.csv`, preferred): rows with `decision` = `Keep` and a `testrail_id`.
+  Skip `level` = `unit` rows: they're for the developers' unit tests (listed under "For developers" in the
+  plan), not E2E.
   The row has everything the test needs: `background` and `scenario` (Given/When/Then lines; older rows
   have `preconditions`/`steps`/`expected` instead), `data` (loop over its rows), `notes` (test ids, routes,
   stubs), `known_issue` (the `test.fixme()` reason), `file` (where the test goes) and `priority`. Rows
@@ -56,15 +58,22 @@ which match `CLAUDE.md`:
 - **Placeholders come from `data`**: a scenario with `<amount>` and `<message>` loops over the `data` rows,
   each row in its own step named with the values filled in (`When Omar enters 0 boxes received`).
 - `notes` holds the technical hints (test ids, routes, what to stub); it's guidance, not part of the case.
+- **`level` = `api` cases** are Playwright tests with no page: use the `request` fixture (or `apiAs(role)`)
+  to set up, act and assert on the responses and the stored result, in the same spec file, with the same
+  `tr()` annotation so the result reaches TestRail. Put them in a `test.describe('API', ...)` block.
+- **Roles:** a case about another role uses `asRole('<role>')` (a page signed in as that role) or
+  `apiAs('<role>')` (a request context with that role's session) from the fixtures; role names come from
+  `roles` in `.qa/config.json`. The default `page` is the default role.
 - **One TestRail case = one test**, so each case gets one result. Keep the case's shape
   (playbook: `${CLAUDE_PLUGIN_ROOT}/skills/plan-feature/test-design.md`):
   - journey case (several When/Then pairs) → one test with a `test.step()` per pair, each ending in its
     own assertion, so a failure names the checkpoint;
   - data-table case → one test that loops over the table rows, each row in its own `test.step()` with
     `expect.soft` where later rows are still worth checking after one fails;
-  - permission case ("even a direct request is refused") → act as the lower role through the UI **and**
-    call the API directly with that role's session (`request` with its storage state, details in `notes`);
-    both must be refused.
+  - permission case ("even a direct request is refused") → in one test, act as the lower role through the
+    UI with `asRole('<role>')` **and** send the request directly with `apiAs('<role>')` (details in
+    `notes`); both must be refused, and a check as the default role (or `asRole('<owner role>')`) proves
+    nothing changed.
 - Assert **business values**, not presence: read the starting value first (stock on hand, balance,
   count), act, then assert the exact new value computed from the inputs. Check the downstream screen or
   API the case names (dashboard, ledger, report), not only the form.

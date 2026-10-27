@@ -154,15 +154,26 @@ Apply the playbook's "No junk" rules in the CSV before handing it over:
 - turn fragments of one business chain into a journey row with a checkpoint per step;
 - drop page-loads, button-exists and duplicate cases, and anything that can't realistically fail;
 - keep a known-bug case in its own row so its failure doesn't hide the healthy checks;
-- aim for 8-15 rows; every row beyond that must name a risk the others don't cover;
+- set each row's `level` to the cheapest test that can catch it (playbook section 4): a validation table
+  is `api` plus at most one `ui` row proving the message reaches the user; a pure calculation with no screen
+  or stored record (tax, rounding) is `unit`;
+- stay within the budget for the feature's risk tier (`cases.budget` in `.qa/config.json`, defaults low 6,
+  medium 12, high 20, counting `ui` and `api` rows); every row beyond it must name a risk the others don't
+  cover;
 - priority from business impact (P1 money/stock/access/data loss in a common flow, P2 wrong but
   recoverable or rare, P3 cosmetic).
 
-Merged and dropped candidates are simply not written (they were never pushed). Then:
+Merged and dropped candidates are simply not written (they were never pushed).
+
+**Independent scoring.** Then have the set scored by a reviewer that hasn't seen this conversation: follow
+`${CLAUDE_PLUGIN_ROOT}/skills/plan-feature/scoring.md` (a subagent that reads only the CSV, the business
+context and the glossary, then `cases.mjs apply-scores`). It fills the `score` column (impact x likelihood)
+and suggests `Merge`, `Drop` or `Rewrite` for rows that fail the rubric. Don't overrule it silently: where you
+disagree, add your reason to `review_notes`. Then:
 
 ```bash
-node .qa/scripts/cases.mjs check specs/cases/<feature-slug>.csv   # no errors; read the risk coverage
-node .qa/scripts/cases.mjs plan  specs/cases/<feature-slug>.csv   # regenerates the plan's scenarios
+node .qa/scripts/cases.mjs check specs/cases/<feature-slug>.csv --tier=<tier>   # no errors; risk coverage and budget
+node .qa/scripts/cases.mjs plan  specs/cases/<feature-slug>.csv                 # regenerates the plan's scenarios
 ```
 
 `check` also enforces the writing rules: technical words, a Then nobody can see, more than 4 When/Then
@@ -177,9 +188,11 @@ out) above the generated block, and a short "Merged / dropped" list at the end.
 
 Tell the user, briefly:
 
-1. a **risk → case** table (from `check`'s coverage, with priorities);
+1. a **risk → case** table (from `check`'s coverage, with priorities and scores), and the count against
+   the tier's budget;
 2. risks **not** covered and why;
-3. cases merged or dropped, one line each;
+3. cases merged or dropped, one line each, and the reviewer's suggestions to merge, drop or rewrite;
+   `unit` rows listed separately as "for developers" (they aren't pushed to TestRail);
 4. the owner's decisions from step 1, open questions (including anything in the implementation that looked
    wrong), and any case kept at P2 because its rule is still `(assumed)`;
 5. the next step: open `specs/cases/<feature-slug>.csv`, fill the `decision` column (`Keep`, `Rewrite`,

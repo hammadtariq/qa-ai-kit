@@ -1,7 +1,7 @@
 {
   "name": "qa-kit",
   "displayName": "QA Kit",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Claude-driven QA pipeline: Playwright test agents for planning, generating and healing tests, TestRail as the system of record, and guard hooks that keep humans in charge of assertions and bug reports.",
   "author": {
     "name": "Hammad Tariq"

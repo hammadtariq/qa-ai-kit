@@ -1,6 +1,6 @@
 # QA Kit improvement plan
 
-Status: **Phase 1 built (0.6.0)**, with the recommended answer for every decision below. Phases 2-4 are
+Status: **Phases 1-2 built (0.6.0, 0.7.0)**, with the recommended answer for every decision below. Phases 3-4 are
 still drafts: mark up any you want changed before work starts.
 
 ## Why

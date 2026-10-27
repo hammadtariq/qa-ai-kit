@@ -74,8 +74,19 @@ Before handing cases over, prune:
 - **Drop** cases that only prove a page loads or something exists, that restate another case with a value
   of no business significance, that can't realistically fail, or that existing cases already cover.
 - **Merge** cases whose actions are the same and only the expected value differs; use a data table.
-- **Aim for 8–15 cases per feature.** More is fine for money-heavy features, but every extra case must name
-  a risk the others don't cover.
+- **Place each check at the cheapest level that can catch it** (`level` column). `ui` (the default) when
+  the risk is in what a person sees or does; `api` when the browser adds nothing, such as a table of 20
+  inputs and their messages (Playwright's `request`, still reported to TestRail), plus at most one `ui`
+  case proving a message reaches the user; `unit` for a pure calculation (tax, rounding, a date rule) with
+  no screen or stored record involved. `unit` cases aren't pushed to TestRail; the plan lists them under
+  "For developers" so they aren't lost. `check` warns when a `ui` case has more than 5 data rows.
+- **Stay within the budget for the area's risk tier** (from "Areas and risk tiers" in the business
+  context): by default 6 cases for low, 12 for medium, 20 for high, counting `ui` and `api` rows
+  (`cases.budget` in `.qa/config.json`). Every case over budget must name a risk the others don't cover;
+  `check --tier=<tier>` names the lowest-scoring rows to cut first.
+- **Every case gets scored by a fresh reader** (`scoring.md`): impact 1-3 (cosmetic, recoverable,
+  money/data/access/legal) × likelihood 1-3 (rare, occasional, common). Under 3 is a drop; a P1 needs impact
+  3; a duplicate merges; a Then nobody can see gets rewritten.
 
 ## 5. Writing the case: Gherkin in the business's words
 

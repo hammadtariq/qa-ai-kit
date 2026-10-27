@@ -14,12 +14,17 @@ try {
 //   - BASE_URL unset and `app.startCommand` set: start this checkout on `app.port` and test it
 //     (`app.devCommand` locally if given, `app.startCommand` in CI). Never point BASE_URL at production.
 type QaApp = { startCommand?: string; devCommand?: string; port?: number; readyPath?: string };
-let app: QaApp = {};
+type QaConfig = { app?: QaApp; roles?: Record<string, unknown> | null; defaultRole?: string | null };
+let qa: QaConfig = {};
 try {
-  app = JSON.parse(readFileSync(".qa/config.json", "utf8")).app ?? {};
+  qa = JSON.parse(readFileSync(".qa/config.json", "utf8"));
 } catch {
   /* no .qa/config.json yet */
 }
+const app: QaApp = qa.app ?? {};
+// The session every test's `page` starts in (e2e/roles.ts): `defaultRole`, else the first of `roles`, else
+// "user" (QA_USER_EMAIL / QA_USER_PASSWORD).
+const defaultRole = qa.defaultRole ?? Object.keys(qa.roles ?? {})[0] ?? "user";
 const localUrl = app.port ? `http://127.0.0.1:${app.port}` : undefined;
 const baseURL = process.env.BASE_URL || localUrl;
 
@@ -65,7 +70,7 @@ export default defineConfig({
     { name: "setup", testMatch: /.*\.setup\.ts/ },
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"], storageState: "playwright/.auth/user.json" },
+      use: { ...devices["Desktop Chrome"], storageState: `playwright/.auth/${defaultRole}.json` },
       dependencies: ["setup"],
     },
     // Add firefox / webkit / mobile projects per client contract, with the same storageState and dependency.

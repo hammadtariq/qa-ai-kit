@@ -7,7 +7,10 @@ the system of record, and people review at five gates. Follow these rules in eve
 
 - Never point tests at production. `BASE_URL` set = a staging URL; unset = Playwright starts this
   checkout using `app` in `.qa/config.json`.
-- Test user: `QA_USER_EMAIL` / `QA_USER_PASSWORD` (a seeded test account). Never hard-code credentials.
+- Test logins: one seeded account per role in `.qa/config.json` `roles` (`<env>_EMAIL` / `<env>_PASSWORD`),
+  or `QA_USER_EMAIL` / `QA_USER_PASSWORD` when there are no roles. Never hard-code credentials. Tests start
+  as the default role; `asRole('<role>')` and `apiAs('<role>')` from the fixtures give a page or a request
+  context signed in as another role.
 - Roles: ROLE_LIST
 - Main areas: AREA_LIST
 - Test data: TEST_DATA_NOTES
@@ -22,7 +25,9 @@ the system of record, and people review at five gates. Follow these rules in eve
 - Cover the realistic dirty paths (bad input, acting twice or out of order, lower roles via UI and API,
   integrity across features, repeats, dates and money, recovery), not just the happy path.
 - No junk: one case per business outcome, journeys with checkpoints over fragments, data tables over
-  one-case-per-field. Playbook: `/qa-kit:plan-feature` follows `skills/plan-feature/test-design.md` in the kit.
+  one-case-per-field. Each case sits at the cheapest `level` that catches it (`ui`, `api`, or `unit` for the
+  developers), the set stays within the area's risk-tier budget, and a fresh reviewer scores every case
+  (impact x likelihood) before Gate 1. Playbook: `/qa-kit:plan-feature` follows `skills/plan-feature/test-design.md` in the kit.
 - **Each case is a short Gherkin scenario in the business's words** (`scenario` column): Given where it
   starts, When the person does one business action, Then what a person can see (a number, a status, a
   quoted message, who can see what). 3-7 lines, glossary terms, no click / button / field / page /
@@ -45,6 +50,8 @@ the system of record, and people review at five gates. Follow these rules in eve
   Use `toMatchAriaSnapshot` for regions whose structure matters.
 - No `waitForTimeout`, `page.pause()` or `test.only`. Rely on auto-waiting and web-first assertions.
 - Seed data through the API (`request` fixture) rather than long UI setup.
+- Permission cases: in one test, the lower role through the UI (`asRole`) and by a direct request (`apiAs`);
+  both refused, and nothing changed. `level: api` cases use `request` / `apiAs` only, no page.
 - Check your work with `node .qa/scripts/lint-specs.mjs <files>` and run new tests with `--repeat-each=3`.
 
 ### Agents driving the live browser (planner, generator, healer)

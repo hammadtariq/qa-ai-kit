@@ -83,8 +83,17 @@ Rules for merging:
 Then look for **gaps**: rank the business context's "must never go wrong" list against the result and
 name any risk with no case. Gaps are proposals for `/qa-kit:plan-feature`, not new cases here.
 
-Aim for the playbook's 8–15 cases per feature. More is fine for money-heavy features if each extra case
+Also check each row's `level`: a long validation table belongs at `api` (keep at most one `ui` row for the
+message), a pure calculation at `unit`. Suggest the change in `review_notes` and as a `Rewrite`.
+
+Aim for the budget of the feature's risk tier (`check --tier=<tier>`, from "Areas and risk tiers" in the
+business context; defaults low 6, medium 12, high 20 `ui` + `api` rows). More is fine only if each extra case
 names a risk the others don't cover.
+
+**Independent scores (when the user asks, or when the set is over budget):** run the reviewer in
+`${CLAUDE_PLUGIN_ROOT}/skills/plan-feature/scoring.md` before your own judgment, apply its scores with
+`cases.mjs apply-scores`, and treat its suggestions as a second opinion: where you disagree, say why in
+`review_notes` rather than overwriting it.
 
 ## 3. Report
 
@@ -92,7 +101,8 @@ Write each verdict to the row's `suggestion` column with a short reason (`Merge 
 guard, different trigger`, `Drop: only proves the page loads`). Don't touch `decision`; that's the
 reviewer's. Then summarise for the user (and in `reports/case-review-<feature>-<yyyy-mm-dd>.md`, gitignored):
 
-1. **Before → after**: case count, P1 count, automated count, in TestRail count.
+1. **Before → after**: case count, P1 count, automated count, in TestRail count, and the count against the
+   tier's budget.
 2. **Resulting cases**: one row each: survivor key and id, title in the owner's words, priority, cases
    merged in, why it matters.
 3. **Rewrites**: id, what's wrong, the fix.

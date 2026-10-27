@@ -41,6 +41,9 @@ jobs:
       TESTRAIL_URL: ${{ secrets.TESTRAIL_URL }}
       TESTRAIL_USER: ${{ secrets.TESTRAIL_USER }}
       TESTRAIL_API_KEY: ${{ secrets.TESTRAIL_API_KEY }}
+      # One pair per role when .qa/config.json has "roles" (setup-project fills these in):
+      # QA_ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+      # QA_ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -122,6 +125,9 @@ jobs:
     env:
       QA_LOCK_ASSERTIONS: "1"
       GH_TOKEN: ${{ github.token }}
+      # One pair per role when .qa/config.json has "roles" (setup-project fills these in):
+      # QA_ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+      # QA_ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 

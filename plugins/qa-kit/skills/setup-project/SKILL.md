@@ -82,7 +82,7 @@ comes from this plugin, so it does not need to be in `.mcp.json`. If `init-agent
 ## 6. Fill in the project specifics
 
 - `.env`: you can't read it (project settings deny it, on purpose). Check what's set with
-  `node -e "try{process.loadEnvFile('.env')}catch{};for(const k of ['BASE_URL','QA_USER_EMAIL','QA_USER_PASSWORD','TESTRAIL_URL','TESTRAIL_USER','TESTRAIL_API_KEY'])console.log(k, process.env[k]?'set':'MISSING')"`
+  `node -e "try{process.loadEnvFile('.env')}catch{};const c=JSON.parse(require('fs').readFileSync('.qa/config.json','utf8'));const r=Object.entries(c.roles||{user:{env:'QA_USER'}}).flatMap(([n,v])=>[(v.env||'QA_'+n.toUpperCase())+'_EMAIL',(v.env||'QA_'+n.toUpperCase())+'_PASSWORD']);for(const k of ['BASE_URL',...r,'TESTRAIL_URL','TESTRAIL_USER','TESTRAIL_API_KEY'])console.log(k, process.env[k]?'set':'MISSING')"`
   and ask the user to fill anything missing from `qa.env.example`. In local-app mode also confirm the
   app's own database variables point at a local database, not production.
 - **Local-app mode:**
@@ -92,8 +92,16 @@ comes from this plugin, so it does not need to be in `.mcp.json`. If `init-agent
     write a per-run test login to `$GITHUB_ENV` (masked), build. Read the repo's own scripts and docs for
     migrations and seeds; never seed against a shared database.
   - Both workflows: uncomment the `services:` block if the app needs a database, in every job that runs tests.
+- **Roles.** Permission cases need one login per role. From the app's role list (and discover's answer on
+  seeded accounts, if it ran), ask which roles have a test account. With more than one, set
+  `.qa/config.json` → `roles`, e.g. `{ "manager": { "env": "QA_MANAGER" }, "staff": { "env": "QA_STAFF" } }`
+  (only roles with an account), and `defaultRole` if the first isn't the one most tests start as. Each role
+  reads `<env>_EMAIL` / `<env>_PASSWORD`; add the pairs to `qa.env.example` and the user's `.env`, and
+  uncomment and copy the `QA_ADMIN_*` lines in each job's `env:` in both workflows, one pair per role. With
+  `roles` left `null`, there's one login, `QA_USER_EMAIL` / `QA_USER_PASSWORD`, as before.
 - `<folder>/auth.setup.ts`: open the login page, find the real field labels and submit button, and update
-  the locators (`getByRole` / `getByLabel`). Credentials stay `process.env.QA_USER_EMAIL` / `QA_USER_PASSWORD`.
+  the locators (`getByRole` / `getByLabel`). It logs in once per role (`<folder>/roles.ts`) and saves
+  `playwright/.auth/<role>.json`; credentials always come from the environment.
 - `CLAUDE.md` QA block: replace `ROLE_LIST`, `AREA_LIST` and `TEST_DATA_NOTES` with real values.
 - `.qa/business-context.md` and `.qa/glossary.md`: installed as templates. They are filled by
   `/qa-kit:discover`, an interview with the product owner, at the end of setup (step 9). Don't fill them
@@ -110,7 +118,8 @@ comes from this plugin, so it does not need to be in `.mcp.json`. If `init-agent
 
 ## 7. Check it works
 
-- `npx playwright test --project=setup` passes, then `npx playwright test <folder>/seed.spec.ts`.
+- `npx playwright test --project=setup` passes (one "authenticate as <role>" per role), then
+  `npx playwright test <folder>/seed.spec.ts`.
 - In local-app mode, also run once with `CI=1` so Playwright starts the built app the way CI will.
 - `node .qa/scripts/lint-specs.mjs` runs clean, and the unit tests still pass.
 - `npx prettier --check` on the new files if the repo uses Prettier (its pre-commit hooks will format otherwise).
@@ -126,7 +135,8 @@ GitHub secrets and variables the workflows need:
 | `TESTRAIL_URL`, `TESTRAIL_USER`, `TESTRAIL_API_KEY` | secrets | dedicated TestRail API user |
 | `TESTRAIL_PROJECT_NAME` | variable | exact TestRail project name (trcli needs it) |
 | `BASE_URL` | variable | staging URL (staging mode only) |
-| `QA_USER_EMAIL`, `QA_USER_PASSWORD` | secrets | staging test account (not needed if `.qa/app-setup.sh` creates one per run) |
+| `QA_USER_EMAIL`, `QA_USER_PASSWORD` | secrets | staging test account (not needed if `.qa/app-setup.sh` creates one per run, or when `roles` is set) |
+| `<env>_EMAIL`, `<env>_PASSWORD` per role | secrets | one pair per role in `.qa/config.json` `roles`, e.g. `QA_MANAGER_EMAIL` (only when `roles` is set) |
 | `QA_KIT_REPO_URL` | secret, optional | only if the kit repo is private: `https://x-access-token:<token>@github.com/<org>/qa-ai-kit.git` |
 | `SLACK_WEBHOOK_URL` | secret, optional | channel for the daily digest |
 

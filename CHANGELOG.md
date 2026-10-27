@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.7.0 (2026-10-27): fewer, stronger cases
+
+Phase 2 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, the model that wrote the cases also
+pruned them, every case was assumed to be a browser test, the budget was a flat 8-15, and there was one
+login while permission cases need several.
+
+- **Test level per case**: new CSV column `level`, `ui` (empty), `api` or `unit`. The playbook places each
+  check at the cheapest level that can catch it: a validation table is `api` plus at most one `ui` case for
+  the message; a pure calculation is `unit`. `api` cases are Playwright tests with `request` / `apiAs`, still
+  reported to TestRail. `unit` rows are never pushed (a row already in TestRail that moves to `unit` is
+  retired) and the plan lists them under "For developers". `check` warns when a `ui` case has more than 5
+  data rows.
+- **Independent scoring before Gate 1**: `plan-feature` step 5 (and `review-cases` on request) runs a
+  subagent that reads only the CSV, the business context and the glossary, with the brief in
+  `skills/plan-feature/scoring.md`. It scores every row: impact 1-3 × likelihood 1-3, unique, observable.
+  **`cases.mjs apply-scores <csv> <scores.json>`** writes the new `score` column (`3x2`) and suggests
+  `Merge into KEY` for duplicates, `Drop` under 3, `Rewrite` for a Then nobody can see or a P1 without
+  impact 3, each with the reason. It never fills `decision`.
+- **Case budget by risk tier** replaces the flat 8-15: `.qa/config.json` → `cases.budget` (defaults low 6,
+  medium 12, high 20, counting `ui` + `api` rows). The tier comes from the area in the business context and
+  is noted in the brief. `check --tier=<tier>` warns over budget and names the lowest-scoring rows; without
+  `--tier` the medium budget applies. `check` warns on a P1 scored below impact 3.
+- **One login per role**: `.qa/config.json` → `roles`, e.g. `{ "manager": { "env": "QA_MANAGER" } }`, read
+  from `QA_MANAGER_EMAIL` / `QA_MANAGER_PASSWORD`. New `e2e/roles.ts`; `auth.setup.ts` logs in once per role
+  and saves `playwright/.auth/<role>.json`; tests start as `defaultRole` (or the first role). New fixtures
+  `asRole(role)` (a page in that role's session) and `apiAs(role)` (a request context with it), so a
+  permission case checks the UI and a direct request in one test. With no `roles`, the single `QA_USER_*`
+  login works as before. Checked on a small two-role app: the permission case passes, fails when the app lets
+  staff refund, and a project without `roles` still logs in once as `user`.
+- `setup-project` asks which roles have test accounts and fills `roles`, `qa.env.example` and the workflows'
+  env; the CI secrets table lists one pair per role. `generate-tests` writes `api` cases without a page,
+  skips `unit` rows and uses `asRole` / `apiAs` for permission cases. `push-cases` shows `for_developers`.
+
+Upgrading from 0.6.x:
+
+1. `/plugin marketplace update qa-ai-kit`.
+2. Copy `templates/.qa/scripts/cases.mjs` into `.qa/scripts/`, and `templates/e2e/roles.ts` into your test
+   folder.
+3. Single login, nothing else to do: existing CSVs (no `level` or `score`) read as `ui` and unscored, and
+   `auth.setup.ts` / `fixtures.ts` keep working. The flat 8-15 warning becomes the medium budget (12);
+   pass `--tier` for others.
+4. Several roles: replace `auth.setup.ts` and `fixtures.ts` with the templates (keep your login locators and
+   any fixtures you added), add `roles` (and optionally `defaultRole`) to `.qa/config.json`, take the
+   `storageState` line from `templates/playwright.config.ts`, and add one secret pair per role in `.env`,
+   GitHub and each workflow job's `env:`.
+5. Optionally add `cases.budget` to `.qa/config.json` to change the defaults.
+
 ## 0.6.0 (2026-10-27): ask the owner, write plain-language cases
 
 Phase 1 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, the business context was guessed

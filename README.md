@@ -42,7 +42,8 @@ It then adds the Playwright config, test helpers, CI workflows and a `.qa/` fold
 [What a project gets](#what-a-project-gets)). At the end it offers to interview the product owner (next
 step). Before merging that branch:
 
-1. Copy `qa.env.example` into your `.env` and fill it in (test login, TestRail user and API key).
+1. Copy `qa.env.example` into your `.env` and fill it in (test logins, one per role if the app has several;
+   TestRail user and API key).
 2. Add the per-repo GitHub variables and secrets listed in AGENCY-SETUP section 4, and create the `qa:*` labels.
 3. Confirm `npx playwright test --project=setup` passes (the login works).
 
@@ -100,8 +101,12 @@ how real users behave, and what must never go wrong: money, stock, access, data)
 - acceptance criteria checked against what the code actually does;
 - realistic **dirty paths**: bad input, double or out-of-order actions, lower roles via UI and API,
   cross-feature effects, dates and money, recovery;
-- **no junk**: one case per business outcome, about 8–15 strong cases per feature, each with a
-  "Why it matters" line.
+- **no junk**: one case per business outcome, each at the cheapest test level that catches it (`ui`, `api`,
+  or `unit` handed to the developers), within a budget set by the area's risk tier (6 / 12 / 20 by
+  default), each with a "Why it matters" line;
+- an **independent score** for every case before a person sees it: a reviewer that hasn't seen the planning
+  scores impact × likelihood, and suggests dropping, merging or rewriting the weak ones. The person still
+  decides.
 
 Each case is a short **Given/When/Then scenario in the business's own words**, readable by a non-technical
 owner:
@@ -124,7 +129,8 @@ CSVs from before 0.6.0 (numbered steps and expected results) keep working; `case
 ## What a project gets
 
 - `playwright.config.ts` with JSON and JUnit reports, isolated retries and a saved login.
-- `e2e/`: `fixtures.ts` (with the `tr('C123')` TestRail helper), `auth.setup.ts`, `seed.spec.ts`, plus
+- `e2e/`: `fixtures.ts` (the `tr('C123')` TestRail helper, and `asRole` / `apiAs` for acting as another role),
+  `auth.setup.ts` and `roles.ts` (one saved login per role), `seed.spec.ts`, plus
   Ant Design helpers if the app uses antd.
 - QA rules appended to `CLAUDE.md`; the plugin and permissions merged into `.claude/settings.json`.
 - `.qa/`: `config.json`, `business-context.md`, `glossary.md`, `app-setup.sh` (CI app prep: database, seed, build) and

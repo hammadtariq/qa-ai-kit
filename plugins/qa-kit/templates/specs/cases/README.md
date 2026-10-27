@@ -34,7 +34,9 @@ and `/qa-kit:push-cases` sends the Keep rows to TestRail and writes the case ids
 | `title`          | The business behaviour in the owner's words, 12 words or fewer (250 characters at most).                           |
 | `priority`       | `P1` money, stock, access or data loss in a common flow; `P2` wrong but recoverable or rare; `P3` cosmetic.        |
 | `type`           | `Functional`, `Security` (permission and tenant cases) or `Regression` (journeys guarding existing behaviour).     |
+| `level`          | Cheapest test that catches it: `ui` (empty = ui), `api` (no page, still in TestRail) or `unit` (for developers).  |
 | `risks`          | Ranks from "What must never go wrong" in `.qa/business-context.md`, like `1;2`. `check` reports coverage per risk. |
+| `score`          | Impact x likelihood from the independent reviewer, like `3x2` (each 1-3). Written by `cases.mjs apply-scores`.    |
 | `why_it_matters` | One sentence: what the business loses if this breaks.                                                              |
 | `background`     | Optional Given lines every case in the section shares. The plan prints them once per section.                      |
 | `scenario`       | The case: Given/When/Then lines, one per line, `And`/`But` allowed. 3-7 lines, at most 4 When/Then pairs.          |
@@ -72,8 +74,14 @@ text in quotes is the app's own wording and is skipped):
 **What reaches TestRail:** `title`, `priority`, `type`, the Given lines (background first) followed by a
 "Why it matters:" line as preconditions, and one step per When/Then pair: the When lines as the step, the
 Then lines as its expected result, keywords kept (the `data` table goes inside step 1). Old rows send
-`preconditions` and the numbered `steps`/`expected`. `risks`, `notes`, `known_issue`, `source`, `file` and
-the review columns stay in the repo, so a push only changes a TestRail case when the case itself changed.
+`preconditions` and the numbered `steps`/`expected`. `risks`, `score`, `notes`, `known_issue`, `source`,
+`file` and the review columns stay in the repo, so a push only changes a TestRail case when the case itself
+changed. `level: unit` rows are never pushed (a pushed one is retired); the plan lists them under "For
+developers".
+
+**Case budget:** `check --tier=low|medium|high` warns when the `ui` + `api` rows exceed the budget for the
+feature's risk tier (`cases.budget` in `.qa/config.json`; defaults 6, 12, 20) and names the lowest-scoring
+rows. Without `--tier` the medium budget applies.
 
 ## Reviewing (Gate 1)
 

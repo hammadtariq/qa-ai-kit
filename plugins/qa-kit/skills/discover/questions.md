@@ -147,6 +147,8 @@ release", "There is another test suite I'll point you to".
   delete", "Only in a separate test organisation".
 
 **Answered when:** where tests run, accounts per role, and whether tests can clean up after themselves.
+Record the accounts as role names (the business's words); `setup-project` turns them into `roles` in
+`.qa/config.json` with one login pair each.
 
 ## Areas and risk tiers
 
