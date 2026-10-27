@@ -85,8 +85,9 @@ Before handing cases over, prune:
   (`cases.budget` in `.qa/config.json`). Every case over budget must name a risk the others don't cover;
   `check --tier=<tier>` names the lowest-scoring rows to cut first.
 - **Every case gets scored by a fresh reader** (`scoring.md`): impact 1-3 (cosmetic, recoverable,
-  money/data/access/legal) × likelihood 1-3 (rare, occasional, common). Under 3 is a drop; a P1 needs impact
-  3; a duplicate merges; a Then nobody can see gets rewritten.
+  money/data/access/legal) × likelihood 1-3 (rare, occasional, common). Impact 1 is a drop however common,
+  unless the business context shows the owner asked for it; under 3 is a drop; a P1 needs impact 3; a
+  duplicate merges; a Then nobody can see gets rewritten.
 
 ## 5. Writing the case: Gherkin in the business's words
 

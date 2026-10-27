@@ -842,9 +842,10 @@ const tableRow = (t) =>
 // ---------------------------------------------------------------- apply-scores
 
 // Scores from the independent reviewer (plan-feature step 5): [{ key, impact, likelihood, unique, duplicate_of,
-// observable, reason }]. Writes the score column and, for rows that fail the rubric, a suggestion. The decision
-// column stays the reviewer's. The first failing rule wins: duplicate, then low value, then unobservable, then a
-// P1 without impact 3.
+// observable, owner_asked, reason }]. Writes the score column and, for rows that fail the rubric, a suggestion.
+// The decision column stays the reviewer's. The first failing rule wins: duplicate, then impact 1 (cosmetic, kept
+// only when the business context shows the owner asked for it), then low value, then unobservable, then a P1
+// without impact 3.
 export function applyScores(rows, scores) {
   const errors = [];
   const changes = [];
@@ -867,6 +868,7 @@ export function applyScores(rows, scores) {
     const why = s.reason ? `; ${s.reason}` : "";
     let suggestion = null;
     if (s.unique === false && target && target !== r) suggestion = `Merge into ${target.key}${s.reason ? `: ${s.reason}` : ""}`;
+    else if (s.impact === 1 && s.owner_asked !== true) suggestion = `Drop: impact 1 (cosmetic or convenience)${why}`;
     else if (s.impact * s.likelihood < 3) suggestion = `Drop: score ${score} under 3${why}`;
     else if (s.observable === false) suggestion = `Rewrite: not observable${why}`;
     else if (r.priority === "P1" && s.impact < 3)

@@ -231,8 +231,9 @@ every row:
 | Unique: does another row already catch this | yes / no |
 | Observable: can a person check the Then | yes / no |
 
-Rows with impact × likelihood under 3, or not unique, or not observable, get `suggestion` = `Drop` or
-`Merge into KEY` with the reason. P1 needs impact 3. The scores go in a new `score` column (for example
+Rows with impact 1 (unless the owner asked for it), impact × likelihood under 3, or not unique, or not
+observable, get `suggestion` = `Drop` or `Merge into KEY` with the reason. (Impact 1 was added after the first
+trial: a cosmetic case scored 1×3 = 3 and survived the product rule.) P1 needs impact 3. The scores go in a new `score` column (for example
 `3x2`) so the reviewer sees why. The person still decides in the `decision` column.
 
 ### 2.3 Case budget by risk

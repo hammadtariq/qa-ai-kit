@@ -154,7 +154,7 @@ test("applyScores writes score and suggests Merge, Drop or Rewrite, never touchi
   const scores = [
     { key: "A-01", impact: 3, likelihood: 3, unique: true, observable: true },
     { key: "A-02", impact: 3, likelihood: 2, unique: false, duplicate_of: "A-01", observable: true, reason: "same refund cap" },
-    { key: "A-03", impact: 1, likelihood: 2, unique: true, observable: true, reason: "label wording only" },
+    { key: "A-03", impact: 2, likelihood: 1, unique: true, observable: true, reason: "needs an unusual input" },
     { key: "A-04", impact: 3, likelihood: 2, unique: true, observable: false, reason: "Then can't be seen" },
     { key: "A-05", impact: 2, likelihood: 3, unique: true, observable: true },
     { key: "A-06", impact: 2, likelihood: 2, unique: true, observable: true },
@@ -166,11 +166,24 @@ test("applyScores writes score and suggests Merge, Drop or Rewrite, never touchi
   assert.equal(by["A-01"].suggestion, "Keep");
   assert.equal(by["A-02"].suggestion, "Merge into A-01: same refund cap");
   assert.equal(by["A-02"].decision, "Keep");
-  assert.equal(by["A-03"].suggestion, "Drop: score 1x2 under 3; label wording only");
+  assert.equal(by["A-03"].suggestion, "Drop: score 2x1 under 3; needs an unusual input");
   assert.equal(by["A-04"].suggestion, "Rewrite: not observable; Then can't be seen");
   assert.equal(by["A-05"].suggestion, "Rewrite: P1 needs impact 3, scored 2x3; make it P2 or show the bigger loss");
   assert.equal(by["A-06"].suggestion, "Keep");
   assert.equal(res.changes.length, 4);
+});
+
+test("applyScores drops impact 1 whatever the likelihood, unless the owner asked for it", () => {
+  const rows = [row({ key: "C-01" }), row({ key: "C-02" }), row({ key: "C-03" })];
+  const res = applyScores(rows, [
+    { key: "C-01", impact: 1, likelihood: 3, unique: true, observable: true, reason: "only the dialog title" },
+    { key: "C-02", impact: 1, likelihood: 3, unique: true, observable: true, owner_asked: true },
+    { key: "C-03", impact: 1, likelihood: 3, unique: false, duplicate_of: "C-02", observable: true },
+  ]);
+  const by = Object.fromEntries(res.rows.map((r) => [r.key, r.suggestion]));
+  assert.equal(by["C-01"], "Drop: impact 1 (cosmetic or convenience); only the dialog title");
+  assert.equal(by["C-02"], "Keep");
+  assert.equal(by["C-03"], "Merge into C-02");
 });
 
 test("applyScores rejects unknown keys, bad numbers and bad merge targets", () => {

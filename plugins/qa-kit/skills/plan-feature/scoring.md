@@ -45,13 +45,18 @@ Score every row on four questions:
 | `likelihood` | How plausible is this situation in real use? | 1 rare (needs an unusual sequence or input); 2 occasional; 3 common (every day, or what a rushed user does) |
 | `unique` | Is it the only row that would catch this problem? | `true`, or `false` with `duplicate_of`: the key of the row that already catches it (the stronger or broader one) |
 | `observable` | Could a person check every Then line by looking at the app? | `true`, or `false` when a Then is vague ("works", "correctly"), invisible (an internal record nobody sees) or not a result at all |
+| `owner_asked` | Only for impact 1: does the business context show the owner asked for this? | `true` only when the context names it (a past complaint, a support promise, a rule); otherwise leave it out |
 
 Judge from the business context, not from how the case is phrased. A case naming a "must never go wrong"
 rule is impact 3 only if breaking this case would actually break that rule. Likelihood comes from how real
 users behave (the context's "Real-world usage" and "Past incidents"); a past incident makes it at least 2.
 
-Add a `reason` of at most 15 words to any row with impact × likelihood under 3, `unique: false` or
-`observable: false`, written for the owner ("only the label wording changes", "RF-02 already refuses the same
+An impact 1 case is dropped however common it is, unless the owner asked for it: a dialog title or a label
+is cosmetic even when everyone sees it. Set `owner_asked: true` only with evidence in the business context,
+and quote it in the `reason`.
+
+Add a `reason` of at most 15 words to any row with impact 1, impact × likelihood under 3, `unique: false`
+or `observable: false`, written for the owner ("only the label wording changes", "RF-02 already refuses the same
 refund").
 
 Write only this JSON array to the output path, one object per row you scored:
@@ -71,6 +76,7 @@ rubric.
 | Result | Suggestion written |
 | --- | --- |
 | `unique: false` | `Merge into <duplicate_of>: <reason>` |
+| impact 1, without `owner_asked: true` | `Drop: impact 1 (cosmetic or convenience); <reason>` |
 | impact × likelihood under 3 | `Drop: score <i>x<l> under 3; <reason>` |
 | `observable: false` | `Rewrite: not observable; <reason>` |
 | P1 with impact under 3 | `Rewrite: P1 needs impact 3, ...` (make it P2, or show the bigger loss) |

@@ -16,8 +16,11 @@ login while permission cases need several.
   subagent that reads only the CSV, the business context and the glossary, with the brief in
   `skills/plan-feature/scoring.md`. It scores every row: impact 1-3 × likelihood 1-3, unique, observable.
   **`cases.mjs apply-scores <csv> <scores.json>`** writes the new `score` column (`3x2`) and suggests
-  `Merge into KEY` for duplicates, `Drop` under 3, `Rewrite` for a Then nobody can see or a P1 without
-  impact 3, each with the reason. It never fills `decision`.
+  `Merge into KEY` for duplicates, `Drop` for impact 1 (however common, unless the reviewer finds in the
+  business context that the owner asked for it: `owner_asked: true`) and for impact × likelihood under 3,
+  `Rewrite` for a Then nobody can see or a P1 without impact 3, each with the reason. It never fills
+  `decision`. On a sample of 8 refund cases a fresh reviewer left 4: two merges, a rare bad-input table and a
+  cosmetic dialog-title case dropped.
 - **Case budget by risk tier** replaces the flat 8-15: `.qa/config.json` → `cases.budget` (defaults low 6,
   medium 12, high 20, counting `ui` + `api` rows). The tier comes from the area in the business context and
   is noted in the brief. `check --tier=<tier>` warns over budget and names the lowest-scoring rows; without
