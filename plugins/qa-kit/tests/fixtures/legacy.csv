@@ -1,0 +1,8 @@
+key,testrail_id,section,title,priority,type,risks,why_it_matters,preconditions,steps,expected,data,notes,known_issue,source,file,suggestion,decision,review_notes
+PO-01,C101,Approve,Approving a purchase adds the stock,P1,Functional,1,Stock counts would be wrong,"Purchase P for 5 bales is pending; signed in as manager","1. Approve P from the list
+2. Open the stock report","1. P shows APPROVED
+2. Stock is 5 bales higher",,Use data-testid=approve,,AC-1,e2e/purchase/approve.spec.ts,Keep,Keep,
+PO-02,,Approve,Quantities below one are refused,P2,Functional,1,Bad stock entries,Signed in as clerk,1. Enter <qty> and save,1. Message <result>,"qty | result
+0 | Quantity must be at least 1
+-1 | Quantity must be at least 1",,,,,Keep,Keep,
+PO-03,C103,Permissions,Clerk cannot approve,P1,Security,2,Anyone could approve their own purchase,Signed in as clerk; purchase P pending,1. Try to approve P,1. Approve is not offered and a direct request is refused,,,,,,Drop: covered by PO-01,Drop,
