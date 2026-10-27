@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -212,6 +212,19 @@ test("loadGlossary reads the table and the names list", () => {
     { word: "admin", use: "Store manager" },
   ]);
   assert.equal(loadGlossary(join(dir, "nope")), null);
+});
+
+test("the untouched glossary template turns the glossary checks off", () => {
+  const dir = mkdtempSync(join(tmpdir(), "qa-kit-"));
+  mkdirSync(join(dir, ".qa"));
+  writeFileSync(
+    join(dir, ".qa", "glossary.md"),
+    readFileSync(new URL("../templates/.qa/glossary.md", import.meta.url), "utf8")
+  );
+  const g = loadGlossary(dir);
+  assert.equal(g.terms.size, 0);
+  assert.deepEqual(g.avoid, []);
+  assert.equal(warningsOf({}, { glossary: g }), "");
 });
 
 test("loadRisks strips the source tag from risk titles", () => {

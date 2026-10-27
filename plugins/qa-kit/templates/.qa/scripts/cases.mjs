@@ -137,6 +137,7 @@ export function loadGlossary(dir = process.cwd()) {
   const terms = new Set();
   const avoid = [];
   const addWords = (t) => t.toLowerCase().match(/[a-z][a-z'-]*/g)?.forEach((w) => terms.add(w));
+  const placeholder = (t) => /^[A-Z][A-Z0-9_]*$/.test(t.trim()); // TERM, NAME: the template's own rows
   let inNames = false;
   for (const raw of readFileSync(p, "utf8").split("\n")) {
     const line = raw.trim();
@@ -146,7 +147,7 @@ export function loadGlossary(dir = process.cwd()) {
         .replace(/^\||\|$/g, "")
         .split("|")
         .map((c) => c.trim());
-      if (/^term$/i.test(cells[0]) || /^[-: ]+$/.test(cells[0])) continue;
+      if (/^term$/i.test(cells[0]) || /^[-: ]+$/.test(cells[0]) || placeholder(cells[0])) continue;
       addWords(cells[0]);
       for (const w of (cells[2] || "").split(/[,;]/)) {
         const word = w.trim().replace(/^["'“]|["'”]$/g, "");
@@ -154,7 +155,7 @@ export function loadGlossary(dir = process.cwd()) {
       }
     } else if (inNames) {
       const m = line.match(/^[-*]\s+\**([^:*]+)/);
-      if (m) addWords(m[1]);
+      if (m && !placeholder(m[1])) addWords(m[1]);
     }
   }
   return { terms, avoid };
