@@ -3,8 +3,9 @@
 // test management tool. The CSV is the source of truth for case design; the plan's scenario section
 // and every export are generated from it. No dependencies.
 //
-//   node .qa/scripts/cases.mjs check <cases.csv> [--push] [--json]
-//       Validate rows and report business-risk coverage. --push also fails on undecided or Rewrite rows.
+//   node .qa/scripts/cases.mjs check <cases.csv> [--tier=low|medium|high] [--push] [--json]
+//       Validate rows and report business-risk coverage. --tier sets the case budget (default medium).
+//       --push also fails on undecided or Rewrite rows.
 //   node .qa/scripts/cases.mjs plan <cases.csv> [plan.md]
 //       Regenerate the plan's Test Scenarios section (between cases markers) from the CSV.
 //   node .qa/scripts/cases.mjs payload <cases.csv>
@@ -15,6 +16,8 @@
 //       One-time conversion of an existing Markdown plan into a cases CSV (Given/When/Then unless --legacy).
 //   node .qa/scripts/cases.mjs migrate <cases.csv>
 //       Convert preconditions/steps/expected rows into a Given/When/Then scenario. Ids and decisions stay.
+//   node .qa/scripts/cases.mjs apply-scores <cases.csv> <scores.json>
+//       Write the independent reviewer's scores and the Drop / Merge / Rewrite suggestions they imply.
 //   node .qa/scripts/cases.mjs set <cases.csv> <KEY> <column>=<value> [...]
 //       Change cells of one row (for example testrail_id=C123 after a push).
 //
@@ -32,7 +35,9 @@ export const COLUMNS = [
   "title",
   "priority",
   "type",
+  "level",
   "risks",
+  "score",
   "why_it_matters",
   "background",
   "scenario",
@@ -51,6 +56,10 @@ export const COLUMNS = [
 const REQUIRED = ["key", "title", "priority", "decision"];
 const PRIORITIES = ["P1", "P2", "P3"];
 const TYPES = ["Functional", "Security", "Regression", "Performance", "Usability", "Other"];
+// The cheapest test level that can catch the problem. Empty means ui. unit rows are never pushed to TestRail.
+const LEVELS = ["ui", "api", "unit"];
+const levelOf = (r) => (r.level || "ui").trim().toLowerCase();
+const DEFAULT_BUDGET = { low: 6, medium: 12, high: 20 };
 const START =
   "<!-- cases:start (generated from the cases CSV by .qa/scripts/cases.mjs; edit the CSV, not this block) -->";
 const END = "<!-- cases:end -->";
@@ -124,6 +133,27 @@ export function loadRisks(dir = process.cwd()) {
     out.push({ rank: Number(m[1]), title: title.slice(0, 80) });
   }
   return out;
+}
+
+// Cases per feature, by the area's risk tier in business-context.md: .qa/config.json cases.budget over the defaults.
+export function loadBudget(dir = process.cwd()) {
+  const p = join(dir, ".qa", "config.json");
+  let own = {};
+  try {
+    own = JSON.parse(readFileSync(p, "utf8")).cases?.budget ?? {};
+  } catch {
+    /* no config yet */
+  }
+  return { ...DEFAULT_BUDGET, ...own };
+}
+
+// "3x2" -> impact 3 (what the owner loses) x likelihood 2 (how plausible in real use), each 1-3.
+export function parseScore(v) {
+  const t = (v || "").trim();
+  if (!t) return null;
+  const m = t.match(/^([1-3])\s*[x×*]\s*([1-3])$/i);
+  if (!m) return { invalid: true };
+  return { impact: Number(m[1]), likelihood: Number(m[2]), value: m[1] * m[2] };
 }
 
 // "(owner, 2026-10-27)", "(code: src/billing/refund.ts)" or "(assumed)" after a fact in business-context.md.
@@ -322,7 +352,11 @@ function checkScenario(r, glossary, err, warn) {
     warn(r, "preconditions, steps and expected are ignored when scenario is filled; clear them");
 }
 
-export function checkCases(rows, { push = false, risks = loadRisks(), glossary = loadGlossary() } = {}, columns = []) {
+export function checkCases(
+  rows,
+  { push = false, risks = loadRisks(), glossary = loadGlossary(), tier = "medium", budget = loadBudget() } = {},
+  columns = []
+) {
   const errors = [];
   const warnings = [];
   const err = (r, m) => errors.push(r ? `row ${r._row} (${r.key || "no key"}): ${m}` : m);
@@ -351,6 +385,11 @@ export function checkCases(rows, { push = false, risks = loadRisks(), glossary =
     else if (r.title.length > 250) err(r, `title is ${r.title.length} characters; TestRail allows 250`);
     if (!PRIORITIES.includes(r.priority)) err(r, `priority "${r.priority}" should be P1, P2 or P3`);
     if (r.type && !TYPES.includes(r.type)) warn(r, `type "${r.type}" isn't one of ${TYPES.join(", ")}`);
+    if (!LEVELS.includes(levelOf(r))) err(r, `level "${r.level}" should be ui, api or unit (empty means ui)`);
+    const sc = parseScore(r.score);
+    if (sc?.invalid) err(r, `score "${r.score}" should look like 3x2 (impact x likelihood, each 1-3)`);
+    else if (sc && isLive(r) && r.priority === "P1" && sc.impact < 3)
+      warn(r, `P1 needs impact 3; scored ${r.score}. Make it P2, or show the bigger loss`);
 
     if (isScenario(r)) checkScenario(r, glossary, err, warn);
     else if (!r.steps && !r.expected) err(r, "scenario is empty: write the case as Given/When/Then lines");
@@ -368,6 +407,8 @@ export function checkCases(rows, { push = false, risks = loadRisks(), glossary =
       const d = parseData(r.data);
       const bad = d.rows.findIndex((x) => x.length !== d.header.length);
       if (!d.rows.length) err(r, "data has a header line but no rows");
+      else if (levelOf(r) === "ui" && d.rows.length > 5)
+        warn(r, `ui case with ${d.rows.length} data rows: check the table at api level, plus one ui case for the message`);
       else if (bad >= 0)
         err(
           r,
@@ -409,10 +450,19 @@ export function checkCases(rows, { push = false, risks = loadRisks(), glossary =
   for (const c of coverage)
     if (!c.cases.length)
       warnings.push(`risk ${c.rank} "${c.title}" has no case in this file (fine if this feature can't affect it)`);
-  if (live.length > 15)
+  if (!budget[tier]) err(null, `tier "${tier}" should be one of ${Object.keys(budget).join(", ")}`);
+  const e2e = live.filter((r) => levelOf(r) !== "unit");
+  if (budget[tier] && e2e.length > budget[tier]) {
+    // Lowest score first; unscored rows after scored ones, P3 before P2 before P1.
+    const rank = (r) => [parseScore(r.score)?.value ?? 10, -PRIORITIES.indexOf(r.priority)];
+    const lowest = [...e2e]
+      .sort((a, b) => rank(a)[0] - rank(b)[0] || rank(a)[1] - rank(b)[1])
+      .slice(0, e2e.length - budget[tier])
+      .map((r) => (r.score ? `${r.key} (${r.score})` : r.key));
     warnings.push(
-      `${live.length} live cases; the playbook aims for 8-15 per feature. Each extra case should name a risk the others don't cover.`
+      `${e2e.length} live cases; the ${tier} budget is ${budget[tier]}. Lowest scoring: ${lowest.join(", ")}. Each case over budget should name a risk the others don't cover.`
     );
+  }
 
   const count = (f) => rows.filter(f).length;
   const summary = {
@@ -422,6 +472,11 @@ export function checkCases(rows, { push = false, risks = loadRisks(), glossary =
     p2: live.filter((r) => r.priority === "P2").length,
     p3: live.filter((r) => r.priority === "P3").length,
     in_testrail: count((r) => r.testrail_id),
+    ui: live.filter((r) => levelOf(r) === "ui").length,
+    api: live.filter((r) => levelOf(r) === "api").length,
+    unit: live.filter((r) => levelOf(r) === "unit").length,
+    tier,
+    budget: budget[tier] ?? null,
     decided: count((r) => parseDecision(r.decision).kind && parseDecision(r.decision).kind !== "invalid"),
     keep: count((r) => parseDecision(r.decision).kind === "keep"),
     rewrite: count((r) => parseDecision(r.decision).kind === "rewrite"),
@@ -478,13 +533,22 @@ export function buildPayload(rows) {
     preconditions: testrailPreconditions(r),
     steps: testrailSteps(r),
   });
-  const keep = rows.filter((r) => parseDecision(r.decision).kind === "keep");
+  const kept = rows.filter((r) => parseDecision(r.decision).kind === "keep");
+  const keep = kept.filter((r) => levelOf(r) !== "unit");
+  const unit = kept.filter((r) => levelOf(r) === "unit");
   return {
     create: keep.filter((r) => !r.testrail_id).map(toCase),
     update: keep.filter((r) => r.testrail_id).map(toCase),
-    retire: rows
-      .filter((r) => r.testrail_id && ["drop", "merge"].includes(parseDecision(r.decision).kind))
-      .map((r) => ({ key: r.key, testrail_id: r.testrail_id, decision: r.decision })),
+    retire: [
+      ...rows
+        .filter((r) => r.testrail_id && ["drop", "merge"].includes(parseDecision(r.decision).kind))
+        .map((r) => ({ key: r.key, testrail_id: r.testrail_id, decision: r.decision })),
+      // A pushed case moved to unit level leaves TestRail; the developers own it now.
+      ...unit
+        .filter((r) => r.testrail_id)
+        .map((r) => ({ key: r.key, testrail_id: r.testrail_id, decision: `${r.decision} (unit level: a developer test now)` })),
+    ],
+    for_developers: unit.map((r) => ({ key: r.key, title: r.title, why_it_matters: r.why_it_matters || "" })),
     held_back: rows
       .filter((r) => !["keep", "drop", "merge"].includes(parseDecision(r.decision).kind))
       .map((r) => ({ key: r.key, decision: r.decision || "(not reviewed)" })),
@@ -515,7 +579,8 @@ const unmd = (t) => (t || "").replace(/\\([*_])/g, "$1");
 export function renderScenarios(rows) {
   const out = [];
   const sections = [];
-  for (const r of rows.filter(isLive)) {
+  const live = rows.filter(isLive);
+  for (const r of live.filter((x) => levelOf(x) !== "unit")) {
     const name = r.section || "Cases";
     let s = sections.find((x) => x.name === name);
     if (!s) sections.push((s = { name, rows: [] }));
@@ -530,57 +595,67 @@ export function renderScenarios(rows) {
       ),
       "```",
     ].join("\n");
+  const renderCase = (r, heading, sharedBackground) => {
+    out.push(`#### ${heading}${md(r.title)}`, "");
+    const meta = [
+      `**TestRail:** ${r.testrail_id || "— (not pushed yet)"}`,
+      `**Key:** ${r.key}`,
+      `**Priority:** ${r.priority}`,
+    ];
+    if (r.type) meta.push(`**Type:** ${r.type}`);
+    if (levelOf(r) !== "ui") meta.push(`**Level:** ${levelOf(r)}`);
+    if (levelOf(r) === "unit" && r.section) meta.push(`**Section:** ${md(r.section)}`);
+    if (r.risks) meta.push(`**Risks:** ${riskList(r.risks).join(", ")}`);
+    if (r.score) meta.push(`**Score:** ${r.score}`);
+    if (r.source) meta.push(`**Source:** ${md(r.source)}`);
+    if (r.known_issue) meta.push(`**${md(r.known_issue)}**`);
+    out.push(meta.join(" · "));
+    if (r.file) out.push(`**File:** \`${r.file}\``);
+    if (r.why_it_matters) out.push(`**Why it matters:** ${md(r.why_it_matters)}`);
+    out.push("");
+    if (isScenario(r)) out.push(gherkin(r.scenario, sharedBackground ? "" : r.background));
+    else {
+      if (r.preconditions) out.push(`**Preconditions:** ${md(r.preconditions)}`, "");
+      out.push("**Steps:**", "");
+      const s = numbered(r.steps).items;
+      const e = numbered(r.expected).items;
+      s.forEach((step, i) => {
+        out.push(`${i + 1}. ${md(step).replace(/\n/g, "\n   ")}`);
+        if (e[i]) out.push(`   - expect: ${md(e[i]).replace(/\n/g, "\n     ")}`);
+      });
+    }
+    const d = parseData(r.data);
+    if (d)
+      out.push(
+        "",
+        mdTable(
+          d.header.map(md),
+          d.rows.map((row) => row.map(md))
+        )
+      );
+    if (r.notes)
+      out.push(
+        "",
+        ...r.notes
+          .split("\n")
+          .filter((l) => l.trim())
+          .map((l) => `- ${md(l.replace(/^[-*]\s*/, ""))}`)
+      );
+    out.push("");
+  };
   sections.forEach((sec, si) => {
     out.push(`### ${si + 1}. ${md(sec.name)}`, "");
     const bg = sec.rows[0].background || "";
     const shared = bg && sec.rows.every((r) => (r.background || "") === bg);
     if (shared) out.push("**Background:**", "", gherkin(bg), "");
-    sec.rows.forEach((r, ci) => {
-      out.push(`#### ${si + 1}.${ci + 1}. ${md(r.title)}`, "");
-      const meta = [
-        `**TestRail:** ${r.testrail_id || "— (not pushed yet)"}`,
-        `**Key:** ${r.key}`,
-        `**Priority:** ${r.priority}`,
-      ];
-      if (r.type) meta.push(`**Type:** ${r.type}`);
-      if (r.risks) meta.push(`**Risks:** ${riskList(r.risks).join(", ")}`);
-      if (r.source) meta.push(`**Source:** ${md(r.source)}`);
-      if (r.known_issue) meta.push(`**${md(r.known_issue)}**`);
-      out.push(meta.join(" · "));
-      if (r.file) out.push(`**File:** \`${r.file}\``);
-      if (r.why_it_matters) out.push(`**Why it matters:** ${md(r.why_it_matters)}`);
-      out.push("");
-      if (isScenario(r)) out.push(gherkin(r.scenario, shared ? "" : r.background));
-      else {
-        if (r.preconditions) out.push(`**Preconditions:** ${md(r.preconditions)}`, "");
-        out.push("**Steps:**", "");
-        const s = numbered(r.steps).items;
-        const e = numbered(r.expected).items;
-        s.forEach((step, i) => {
-          out.push(`${i + 1}. ${md(step).replace(/\n/g, "\n   ")}`);
-          if (e[i]) out.push(`   - expect: ${md(e[i]).replace(/\n/g, "\n     ")}`);
-        });
-      }
-      const d = parseData(r.data);
-      if (d)
-        out.push(
-          "",
-          mdTable(
-            d.header.map(md),
-            d.rows.map((row) => row.map(md))
-          )
-        );
-      if (r.notes)
-        out.push(
-          "",
-          ...r.notes
-            .split("\n")
-            .filter((l) => l.trim())
-            .map((l) => `- ${md(l.replace(/^[-*]\s*/, ""))}`)
-        );
-      out.push("");
-    });
+    sec.rows.forEach((r, ci) => renderCase(r, `${si + 1}.${ci + 1}. `, shared));
   });
+  // unit rows aren't pushed to TestRail or automated as E2E; they're handed to the developers.
+  const unit = live.filter((r) => levelOf(r) === "unit");
+  if (unit.length) {
+    out.push("### For developers", "", "Checks best placed in unit tests. Not pushed to TestRail.", "");
+    unit.forEach((r) => renderCase(r, "", false));
+  }
   return out.join("\n").trimEnd() + "\n";
 }
 
@@ -664,6 +739,9 @@ function caseFromBlock(text, section) {
       else if (k === "why it matters") r.why_it_matters = v;
       else if (k === "key") r.key = v;
       else if (k === "risks") r.risks = v.replace(/\s*,\s*/g, ";");
+      else if (k === "level") r.level = v;
+      else if (k === "score") r.score = v;
+      else if (k === "section") r.section = v;
       else if (k === "source") source.push(v);
       else source.push(`${m[1].trim()} ${v}`);
     } else {
@@ -761,6 +839,47 @@ const tableRow = (t) =>
     .map((c) => c.trim().replace(/\\\|/g, "/"))
     .join(" | ");
 
+// ---------------------------------------------------------------- apply-scores
+
+// Scores from the independent reviewer (plan-feature step 5): [{ key, impact, likelihood, unique, duplicate_of,
+// observable, reason }]. Writes the score column and, for rows that fail the rubric, a suggestion. The decision
+// column stays the reviewer's. The first failing rule wins: duplicate, then low value, then unobservable, then a
+// P1 without impact 3.
+export function applyScores(rows, scores) {
+  const errors = [];
+  const changes = [];
+  const out = rows.map((r) => ({ ...r }));
+  const byKey = new Map(out.map((r) => [r.key, r]));
+  for (const s of scores) {
+    const r = byKey.get(s.key);
+    if (!r) {
+      errors.push(`${s.key} isn't in the file`);
+      continue;
+    }
+    if (![1, 2, 3].includes(s.impact) || ![1, 2, 3].includes(s.likelihood)) {
+      errors.push(`${s.key}: impact and likelihood must be 1, 2 or 3`);
+      continue;
+    }
+    const target = s.duplicate_of && byKey.get(String(s.duplicate_of).toUpperCase());
+    if (s.unique === false && (!target || target === r))
+      errors.push(`${s.key}: duplicate_of "${s.duplicate_of || ""}" must be another key in the file`);
+    const score = `${s.impact}x${s.likelihood}`;
+    const why = s.reason ? `; ${s.reason}` : "";
+    let suggestion = null;
+    if (s.unique === false && target && target !== r) suggestion = `Merge into ${target.key}${s.reason ? `: ${s.reason}` : ""}`;
+    else if (s.impact * s.likelihood < 3) suggestion = `Drop: score ${score} under 3${why}`;
+    else if (s.observable === false) suggestion = `Rewrite: not observable${why}`;
+    else if (r.priority === "P1" && s.impact < 3)
+      suggestion = `Rewrite: P1 needs impact 3, scored ${score}; make it P2 or show the bigger loss`;
+    r.score = score;
+    if (suggestion) {
+      r.suggestion = suggestion;
+      changes.push({ key: r.key, score, suggestion });
+    } else if (!r.suggestion) r.suggestion = "Keep";
+  }
+  return { rows: out, changes, errors };
+}
+
 // ---------------------------------------------------------------- migrate
 
 const MIGRATED = "Rewrite: converted to Given/When/Then, check the wording";
@@ -800,7 +919,7 @@ export function migrateRows(rows) {
 function testrailCsv(rows) {
   const cols = ["ID", "Key", "Section", "Title", "Priority", "Type", "Preconditions", "Step", "Expected Result"];
   const out = [];
-  for (const r of rows.filter((x) => parseDecision(x.decision).kind === "keep")) {
+  for (const r of rows.filter((x) => parseDecision(x.decision).kind === "keep" && levelOf(x) !== "unit")) {
     testrailSteps(r).forEach((s, i) => {
       out.push(
         i === 0
@@ -837,9 +956,9 @@ function main() {
   const args = rest.filter((a) => !a.startsWith("--"));
 
   if (cmd === "check") {
-    if (!args[0]) fail("Usage: cases.mjs check <cases.csv> [--push] [--json]");
+    if (!args[0]) fail("Usage: cases.mjs check <cases.csv> [--tier=low|medium|high] [--push] [--json]");
     const { columns, rows } = loadCases(args[0]);
-    const res = checkCases(rows, { push: !!flags.push }, columns);
+    const res = checkCases(rows, { push: !!flags.push, ...(flags.tier ? { tier: String(flags.tier) } : {}) }, columns);
     if (flags.json) console.log(JSON.stringify(res, null, 2));
     else {
       const s = res.summary;
@@ -849,6 +968,7 @@ function main() {
       console.log(
         `Review: ${s.keep} keep, ${s.rewrite} rewrite, ${s.merge} merge, ${s.drop} drop, ${s.undecided} not reviewed`
       );
+      console.log(`Levels: ${s.ui} ui, ${s.api} api, ${s.unit} unit; ${s.tier} budget ${s.budget ?? "?"} (ui + api)`);
       if (res.coverage.length) {
         console.log("\nBusiness risk coverage (.qa/business-context.md):");
         for (const c of res.coverage)
@@ -913,6 +1033,25 @@ function main() {
     return;
   }
 
+  if (cmd === "apply-scores") {
+    if (!args[0] || !args[1]) fail("Usage: cases.mjs apply-scores <cases.csv> <scores.json>");
+    const { columns, rows } = loadCases(args[0]);
+    let scores;
+    try {
+      scores = JSON.parse(read(args[1]));
+    } catch (e) {
+      fail(`${args[1]} isn't valid JSON: ${e.message}`);
+    }
+    if (!Array.isArray(scores)) scores = scores.scores;
+    if (!Array.isArray(scores)) fail(`${args[1]} should be a JSON array of { key, impact, likelihood, unique, observable }`);
+    const res = applyScores(rows, scores);
+    if (res.errors.length) fail(`Nothing written:\n${res.errors.join("\n")}`);
+    saveCases(args[0], res.rows, columns);
+    console.log(`Scored ${scores.length} rows; ${res.changes.length} suggestions changed:`);
+    for (const c of res.changes) console.log(`  ${c.key} ${c.score}: ${c.suggestion}`);
+    return;
+  }
+
   if (cmd === "migrate") {
     if (!args[0]) fail("Usage: cases.mjs migrate <cases.csv>");
     const { columns, rows } = loadCases(args[0]);
@@ -945,7 +1084,7 @@ function main() {
     return;
   }
 
-  fail("Commands: check, plan, payload, testrail, from-plan, migrate, set. See the header of this file.");
+  fail("Commands: check, plan, payload, testrail, from-plan, migrate, apply-scores, set. See the header of this file.");
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) main();
