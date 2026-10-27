@@ -23,7 +23,8 @@ function config(): QaConfig {
 }
 
 export function qaRoles(): QaRole[] {
-  const roles = config().roles ?? { user: { env: 'QA_USER' } };
+  const configured = config().roles;
+  const roles = configured && Object.keys(configured).length ? configured : { user: { env: 'QA_USER' } };
   return Object.entries(roles).map(([name, r]) => ({
     name,
     env: r?.env ?? `QA_${name.toUpperCase().replace(/\W+/g, '_')}`,
@@ -31,9 +32,15 @@ export function qaRoles(): QaRole[] {
   }));
 }
 
-export function qaRole(name: string): QaRole {
+export function qaRole(name: string, setting = 'role'): QaRole {
   const all = qaRoles();
   const found = all.find((r) => r.name === name);
-  if (!found) throw new Error(`Unknown role "${name}". Roles in .qa/config.json: ${all.map((r) => r.name).join(', ')}`);
+  if (!found) throw new Error(`Unknown ${setting} "${name}". Roles in .qa/config.json: ${all.map((r) => r.name).join(', ')}`);
   return found;
+}
+
+/** The role every test's `page` starts as: `defaultRole` if set (it must be one of the roles), else the first role. */
+export function defaultRole(): QaRole {
+  const name = config().defaultRole;
+  return name ? qaRole(name, 'defaultRole') : qaRoles()[0];
 }

@@ -35,6 +35,8 @@ type QaFixtures = {
 };
 
 export const test = base.extend<QaFixtures>({
+  // Inside a test, browser.newContext() already applies the project's `use` (device, locale, time zone),
+  // so the role's page matches `page`; only the session differs.
   asRole: async ({ browser, baseURL, contextOptions }, use) => {
     const contexts: BrowserContext[] = [];
     await use(async (role) => {

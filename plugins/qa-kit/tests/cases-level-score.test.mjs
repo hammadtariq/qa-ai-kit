@@ -58,6 +58,14 @@ test("a ui case with a data table over 5 rows warns", () => {
   assert.doesNotMatch(text(check([row({ scenario, data, level: "api" })])), /data rows/);
 });
 
+test("a ui case with a long data table still gets the bad-row error", () => {
+  const data = ["amount | message", ...[0, -1, -2, 1.5, 2.5].map((v) => `${v} | no`), "99999"].join("\n");
+  const scenario = "Given Omar is receiving D-3\nWhen Omar enters <amount>\nThen Omar sees <message>";
+  const res = check([row({ scenario, data })]);
+  assert.match(res.errors.join(), /data row 6 has 1 cells, header has 2/);
+  assert.match(res.warnings.join(), /6 data rows/);
+});
+
 test("parseScore reads impact x likelihood", () => {
   assert.deepEqual(parseScore("3x2"), { impact: 3, likelihood: 2, value: 6 });
   assert.deepEqual(parseScore(" 1 × 3 "), { impact: 1, likelihood: 3, value: 3 });

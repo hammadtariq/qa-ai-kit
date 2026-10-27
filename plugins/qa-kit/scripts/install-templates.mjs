@@ -70,7 +70,7 @@ const retarget = (text) =>
     : text
         .replace(/testDir: "\.\/e2e"/g, `testDir: "./${testDir}"`)
         .replace(/"testDir": "e2e"/g, `"testDir": "${testDir}"`)
-        .replace(/(^|[\s`'"(])e2e\//g, `$1${testDir}/`);
+        .replace(/(^|[\s`'"(])(\.\/)?e2e\//g, `$1$2${testDir}/`);
 const TEXT = /\.(md|ts|js|mjs|json|ya?ml|sh|example|qa)$/;
 
 function writeFile(rel, content, mode) {

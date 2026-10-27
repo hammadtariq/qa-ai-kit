@@ -168,6 +168,14 @@ test("placeholders must match the data header", () => {
   assert.equal(errorsOf({ scenario, data: "qty | message\n0 | \"At least 1\"" }), "");
   assert.match(errorsOf({ scenario, data: "qty\n0" }), /<message>/);
   assert.match(errorsOf({ scenario }), /no data table/);
+  assert.match(errorsOf({ scenario, data: "  \n " }), /no data table/);
+  assert.equal(errorsOf({ data: "  \n " }), "");
+});
+
+test("a When with no Then is an error, without a warning about an undefined Then", () => {
+  const res = check([row({ scenario: "Given Ali has an order\nWhen Ali pays" })]);
+  assert.ok(res.errors.length);
+  assert.doesNotMatch([...res.errors, ...res.warnings].join("\n"), /undefined/);
 });
 
 test("glossary: avoided words warn with the preferred term, unknown capitalised nouns warn", () => {

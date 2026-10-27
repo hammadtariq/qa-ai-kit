@@ -320,7 +320,8 @@ function checkScenario(r, glossary, err, warn) {
   if (count > 7) warn(r, `scenario has ${count} lines; aim for 3-7 (split it, or move shared setup into background)`);
   if (s.pairs.length > 4) err(r, `scenario has ${s.pairs.length} When/Then pairs; a journey has at most 4, split it`);
 
-  for (const p of s.pairs) {
+  // A When without a Then is already an error from parseScenario.
+  for (const p of s.pairs.filter((x) => x.then.length)) {
     const then = p.then.join(" ");
     const vague = ownWords(then).match(VAGUE);
     if (vague) warn(r, `"${p.then[0]}" says "${vague[1]}": say what a person sees (a number, a status, a quoted message)`);
@@ -329,9 +330,10 @@ function checkScenario(r, glossary, err, warn) {
   }
 
   const names = [...new Set(placeholders(`${r.background || ""}\n${r.scenario}`))];
-  if (names.length && !r.data) err(r, `scenario uses <${names[0]}> but has no data table`);
+  const table = parseData(r.data);
+  if (names.length && !table) err(r, `scenario uses <${names[0]}> but has no data table`);
   else if (names.length) {
-    const header = parseData(r.data).header;
+    const header = table.header;
     for (const n of names.filter((x) => !header.includes(x))) err(r, `scenario uses <${n}>, which isn't a column in data`);
   }
 
@@ -403,19 +405,19 @@ export function checkCases(
         err(r, `${s.items.length} steps but ${e.items.length} expected results; give every step its own expected result`);
       }
     }
-    if (r.data) {
-      const d = parseData(r.data);
-      const bad = d.rows.findIndex((x) => x.length !== d.header.length);
-      if (!d.rows.length) err(r, "data has a header line but no rows");
-      else if (levelOf(r) === "ui" && d.rows.length > 5)
-        warn(r, `ui case with ${d.rows.length} data rows: check the table at api level, plus one ui case for the message`);
+    const table = parseData(r.data);
+    if (table) {
+      const bad = table.rows.findIndex((x) => x.length !== table.header.length);
+      if (!table.rows.length) err(r, "data has a header line but no rows");
       else if (bad >= 0)
         err(
           r,
-          `data row ${bad + 1} has ${d.rows[bad].length} cells, header has ${
-            d.header.length
+          `data row ${bad + 1} has ${table.rows[bad].length} cells, header has ${
+            table.header.length
           } (separate cells with " | ")`
         );
+      if (levelOf(r) === "ui" && table.rows.length > 5)
+        warn(r, `ui case with ${table.rows.length} data rows: check the table at api level, plus one ui case for the message`);
     }
     if (isLive(r) && !r.why_it_matters) warn(r, "why_it_matters is empty");
 

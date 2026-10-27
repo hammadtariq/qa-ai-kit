@@ -25,12 +25,17 @@ login while permission cases need several.
   medium 12, high 20, counting `ui` + `api` rows). The tier comes from the area in the business context and
   is noted in the brief. `check --tier=<tier>` warns over budget and names the lowest-scoring rows; without
   `--tier` the medium budget applies. `check` warns on a P1 scored below impact 3.
+- `check` fixes: a `ui` case with a long data table still gets the bad-row error next to the "use api"
+  warning; a `data` cell holding only spaces no longer crashes it; a When without a Then no longer adds a
+  warning about an `"undefined"` Then.
 - **One login per role**: `.qa/config.json` → `roles`, e.g. `{ "manager": { "env": "QA_MANAGER" } }`, read
   from `QA_MANAGER_EMAIL` / `QA_MANAGER_PASSWORD`. New `e2e/roles.ts`; `auth.setup.ts` logs in once per role
   and saves `playwright/.auth/<role>.json`; tests start as `defaultRole` (or the first role). New fixtures
   `asRole(role)` (a page in that role's session) and `apiAs(role)` (a request context with it), so a
   permission case checks the UI and a direct request in one test. With no `roles`, the single `QA_USER_*`
-  login works as before. Checked on a small two-role app: the permission case passes, fails when the app lets
+  login works as before (an empty `"roles": {}` counts as none). `defaultRole` must be one of the roles:
+  a typo stops the run with `Unknown defaultRole "..."` instead of failing every test on a missing session
+  file. Checked on a small two-role app: the permission case passes, fails when the app lets
   staff refund, and a project without `roles` still logs in once as `user`.
 - `setup-project` asks which roles have test accounts and fills `roles`, `qa.env.example` and the workflows'
   env; the CI secrets table lists one pair per role. `generate-tests` writes `api` cases without a page,
@@ -46,7 +51,7 @@ Upgrading from 0.6.x:
    pass `--tier` for others.
 4. Several roles: replace `auth.setup.ts` and `fixtures.ts` with the templates (keep your login locators and
    any fixtures you added), add `roles` (and optionally `defaultRole`) to `.qa/config.json`, take the
-   `storageState` line from `templates/playwright.config.ts`, and add one secret pair per role in `.env`,
+   `defaultRole` import and `storageState` line from `templates/playwright.config.ts`, and add one secret pair per role in `.env`,
    GitHub and each workflow job's `env:`.
 5. Optionally add `cases.budget` to `.qa/config.json` to change the defaults.
 

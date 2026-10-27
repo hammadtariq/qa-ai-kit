@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { defaultRole } from "./e2e/roles";
 
 // Local runs read .env; CI passes the same names as secrets/variables.
 try {
@@ -14,7 +15,7 @@ try {
 //   - BASE_URL unset and `app.startCommand` set: start this checkout on `app.port` and test it
 //     (`app.devCommand` locally if given, `app.startCommand` in CI). Never point BASE_URL at production.
 type QaApp = { startCommand?: string; devCommand?: string; port?: number; readyPath?: string };
-type QaConfig = { app?: QaApp; roles?: Record<string, unknown> | null; defaultRole?: string | null };
+type QaConfig = { app?: QaApp };
 let qa: QaConfig = {};
 try {
   qa = JSON.parse(readFileSync(".qa/config.json", "utf8"));
@@ -22,9 +23,9 @@ try {
   /* no .qa/config.json yet */
 }
 const app: QaApp = qa.app ?? {};
-// The session every test's `page` starts in (e2e/roles.ts): `defaultRole`, else the first of `roles`, else
-// "user" (QA_USER_EMAIL / QA_USER_PASSWORD).
-const defaultRole = qa.defaultRole ?? Object.keys(qa.roles ?? {})[0] ?? "user";
+// The session every test's `page` starts in: `defaultRole`, else the first of `roles`, else "user"
+// (QA_USER_EMAIL / QA_USER_PASSWORD). Throws here if `defaultRole` isn't one of the roles.
+const startRole = defaultRole();
 const localUrl = app.port ? `http://127.0.0.1:${app.port}` : undefined;
 const baseURL = process.env.BASE_URL || localUrl;
 
@@ -70,7 +71,7 @@ export default defineConfig({
     { name: "setup", testMatch: /.*\.setup\.ts/ },
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"], storageState: `playwright/.auth/${defaultRole}.json` },
+      use: { ...devices["Desktop Chrome"], storageState: startRole.authFile },
       dependencies: ["setup"],
     },
     // Add firefox / webkit / mobile projects per client contract, with the same storageState and dependency.
