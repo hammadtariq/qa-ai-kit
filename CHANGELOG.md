@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.6.0 (2026-10-27): ask the owner, write plain-language cases
+
+Phase 1 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, the business context was guessed
+from repo docs (and on repos without docs, guesses became P1 cases), and cases read like test scripts that a
+non-technical owner couldn't review quickly.
+
+- **New skill `/qa-kit:discover`**: reads the repo, then interviews the product owner one multiple-choice
+  question at a time, each answer drafted from the code and marked "(Recommended)". It follows up on every
+  disaster until it is a rule a test can check, stops when every area is answered (10-20 questions on a first
+  run), and on re-runs asks only about gaps: `(assumed)` facts, facts older than 6 months, placeholders.
+  `/qa-kit:discover <area>` asks about one area. Without an owner in the session it writes drafts tagged
+  `(assumed)` and lists the open questions.
+- **`.qa/business-context.md`** gets a source tag on every fact (`(owner, date)`, `(code: path)` or
+  `(assumed)`) and new sections: roles, key journeys, outside services, support promises, existing test
+  coverage, releases, test environment and data, areas with a risk tier, open questions. Only owner facts
+  justify a P1.
+- **New `.qa/glossary.md`**: about 15 business terms, the words to avoid for each, and the names used in
+  examples.
+- **Cases are Gherkin in the business's words.** New CSV columns `scenario` (Given/When/Then lines) and
+  `background` (shared Given lines, printed once per section in the plan). In TestRail the Given lines are
+  the preconditions and each When/Then pair is one step and its expected result, keywords kept. The plan
+  shows each case as a `gherkin` block, and `from-plan` reads those blocks back.
+- **`cases.mjs check` enforces the writing rules** in `title` and `scenario` (`notes` and quoted text are
+  never checked): errors for click, button, selector, endpoint, status code, database, xpath, css; for a
+  scenario that doesn't start with Given or has a When with no Then; for more than 4 When/Then pairs; and
+  for a `<placeholder>` missing from `data`. Warnings for page, field, screen, form, dropdown, URL, API;
+  titles over 12 words; scenarios over 7 lines; a Then with nothing a person can see or with "correctly",
+  "as expected", "works"; words the glossary avoids or doesn't have.
+- **`cases.mjs migrate <csv>`** converts steps/expected rows to scenarios (Given from preconditions, When
+  from each step, Then from its expected result, "; " splitting into And lines). It never changes `decision`
+  or `testrail_id`, and marks each converted row `Rewrite: converted to Given/When/Then, check the wording`.
+  `from-plan` writes scenarios too (`--legacy` for the old columns).
+- **Playbook** (`test-design.md`): neutral examples from several kinds of business instead of one
+  inventory app, a section on writing Gherkin cases, journeys as When/Then pairs, and good / bad case pairs.
+  New **risk packs** (`skills/plan-feature/risk-packs/`) for ecommerce, SaaS billing, booking, marketplace,
+  fintech ledgers, content / CMS, internal admin and healthcare; discover picks them, and they seed
+  questions, never cases.
+- **`plan-feature`** runs discover when the context is missing or a disaster is `(assumed)`, asks up to
+  about six feature questions one at a time (each with the code's answer recommended) and records them in
+  the brief's new `## Decisions` table, and has the planner write `gherkin` blocks. Without an owner it
+  still posts the questions on the issue and stops.
+- **`review-cases`** judges wording against the new rules (`Rewrite` covers technical wording and cases that
+  are too long), imports TestRail sections as scenarios and offers `migrate` for old CSVs.
+- **`generate-tests`** names each `test.step` after its scenario line (`When the manager approves order
+  A-17`), so the HTML report reads like the case, and loops over `data` rows for placeholders.
+- **`setup-project`** installs the glossary and ends by offering `/qa-kit:discover` (or telling the user to
+  have the owner run it).
+- **Tests for the kit's scripts**: `node --test 'plugins/qa-kit/tests/*.test.mjs'` (no dependencies) covers
+  the old steps/expected path, scenario parsing, the TestRail mapping, the checks, migrate and the plan round
+  trip.
+
+Upgrading from 0.5.x:
+
+1. `/plugin marketplace update qa-ai-kit`.
+2. Copy `templates/.qa/scripts/cases.mjs`, `templates/.qa/glossary.md` and `templates/specs/cases/README.md`
+   into the repo (`.qa/scripts/`, `.qa/`, `specs/cases/`), and add the "Each case is a short Gherkin
+   scenario" line and `/qa-kit:discover` to the QA block in `CLAUDE.md` (from `templates/CLAUDE.qa.md`).
+3. Run `/qa-kit:discover` with the product owner. Your existing `.qa/business-context.md` is kept: discover
+   tags what it finds `(assumed)` until the owner confirms it, and keeps the "must never go wrong" numbers
+   your CSVs already reference.
+4. Existing cases CSVs keep working without changes. To convert one: `node .qa/scripts/cases.mjs migrate
+   <csv>`, reword the converted rows, run `check`, then `/qa-kit:push-cases`. Ids stay the same, but the
+   TestRail text changes to Given/When/Then, so every converted row is sent as an update once and goes back
+   to AI draft for the QA lead to approve again. Rows that weren't converted aren't re-sent.
+
 ## 0.5.0 (2026-10-22): browser agents don't hang
 
 From the pilot: `plan-feature`'s planner sometimes sat for minutes on one browser action until someone

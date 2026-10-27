@@ -1,7 +1,7 @@
 # QA Kit improvement plan
 
-Status: **draft for review**. Nothing here is built yet. Mark up the "Decisions for you" section and any
-phase you want changed; work starts once it's agreed.
+Status: **Phase 1 built (0.6.0)**, with the recommended answer for every decision below. Phases 2-4 are
+still drafts: mark up any you want changed before work starts.
 
 ## Why
 
