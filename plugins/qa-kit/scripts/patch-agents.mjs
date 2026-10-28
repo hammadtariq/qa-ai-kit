@@ -6,7 +6,8 @@
 //
 // - healer: healing rules (locators, waits and navigation only; never assertions)
 // - planner, generator: what to do when the browser gets stuck (the QA Kit guard's timeout errors)
-// - .mcp.json: runs the playwright-test server through .qa/scripts/mcp-guard.mjs (per-tool time limits)
+// - .mcp.json: runs the playwright-test server through .qa/scripts/mcp-guard.mjs (per-tool time limits), and in
+//   standalone mode (`playwrightDir` "qa" in .qa/config.json) from qa/'s Playwright with its config
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -74,13 +75,23 @@ if (existsSync(mcpPath)) {
   const mcp = JSON.parse(readFileSync(mcpPath, "utf8"));
   const srv = mcp.mcpServers?.["playwright-test"];
   if (srv) {
-    const args = srv.args || [];
+    let args = srv.args || [];
     const guarded = srv.command === "node" && String(args[0] || "").endsWith("mcp-guard.mjs");
     if (!guarded) {
+      let server = [srv.command, ...args];
+      // Standalone: there's no Playwright at the root, so run qa/'s with qa/'s config.
+      let pwDir = ".";
+      try {
+        pwDir = JSON.parse(readFileSync(join(dir, ".qa/config.json"), "utf8")).playwrightDir || ".";
+      } catch {}
+      if (pwDir !== "." && server[0] === "npx" && server[1] === "playwright") {
+        server = [`${pwDir}/node_modules/.bin/playwright`, ...server.slice(2)];
+        if (!server.includes("-c") && !server.includes("--config")) server.push("-c", pwDir);
+      }
       mcp.mcpServers["playwright-test"] = {
         ...srv,
         command: "node",
-        args: [".qa/scripts/mcp-guard.mjs", "--", srv.command, ...args],
+        args: [".qa/scripts/mcp-guard.mjs", "--", ...server],
       };
       writeFileSync(mcpPath, JSON.stringify(mcp, null, 2) + "\n");
       done.push(".mcp.json (playwright-test runs through .qa/scripts/mcp-guard.mjs)");

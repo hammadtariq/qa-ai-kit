@@ -51,7 +51,6 @@ jobs:
         with:
           qa-user-email: ${{ secrets.QA_USER_EMAIL }}
           qa-user-password: ${{ secrets.QA_USER_PASSWORD }}
-          browsers: chromium
 
       - name: Run title
         id: title
@@ -67,7 +66,7 @@ jobs:
       - name: Full regression
         id: run
         continue-on-error: true
-        run: npx playwright test --grep-invert @quarantine
+        run: $QA_TEST --grep-invert @quarantine
 
       - name: Update flaky history
         id: flaky

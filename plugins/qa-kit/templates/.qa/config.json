@@ -1,13 +1,16 @@
 {
   "name": "CLIENT_PROJECT_NAME",
-  "kitVersion": "0.7.0",
+  "kitVersion": "0.8.0",
   "testDir": "e2e",
+  "playwrightDir": ".",
   "app": {
     "startCommand": null,
     "devCommand": null,
     "port": null,
     "readyPath": "/"
   },
+  "tracker": null,
+  "browsers": null,
   "roles": null,
   "defaultRole": null,
   "cases": {

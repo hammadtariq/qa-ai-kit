@@ -46,9 +46,9 @@ justify a P1 case.
 
 ## Outside services
 <!-- Payments, email, SMS, sign-in, ERPs, webhooks. Tests use sandboxes; anything without one is stubbed. -->
-| Service | What for | Test mode | Source |
-| --- | --- | --- | --- |
-| SERVICE | PURPOSE | sandbox / none / unknown | (assumed) |
+| Service | What for | Test mode | In tests | Source |
+| --- | --- | --- | --- | --- |
+| SERVICE | PURPOSE | sandbox / none / unknown | test mode / test inbox / stub / unknown | (assumed) |
 
 ## Support promises
 - **Browsers and devices:** Chrome desktop (assumed)

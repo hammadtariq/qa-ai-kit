@@ -21,6 +21,8 @@
 //       Write the independent reviewer's scores and the Drop / Merge / Rewrite suggestions they imply.
 //   node .qa/scripts/cases.mjs set <cases.csv> <KEY> <column>=<value> [...]
 //       Change cells of one row (for example testrail_id=C123 after a push).
+//   node .qa/scripts/cases.mjs tracker
+//       Print where cases live: "testrail" or "none" (the CSV is the only record; tests use the row key).
 //
 // A case is a Gherkin scenario in the scenario column (Given/When/Then lines, And/But allowed), written in the
 // business's words. Files from before 0.6.0 use preconditions/steps/expected instead; both are read.
@@ -28,6 +30,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { readRecords, writeCsv } from "./lib/csv.mjs";
+import { trackerOf } from "./lib/specs.mjs";
 
 const OUTER_PIPES = /^\||\|$/g; // the leading and trailing | of a Markdown table row
 
@@ -1074,6 +1077,8 @@ function main() {
     return;
   }
 
+  if (cmd === "tracker") return console.log(trackerOf());
+
   if (cmd === "set") {
     const [path, key, ...pairs] = args;
     if (!path || !key || !pairs.length) fail("Usage: cases.mjs set <cases.csv> <KEY> <column>=<value> [...]");
@@ -1091,7 +1096,7 @@ function main() {
     return;
   }
 
-  fail("Commands: check, plan, payload, testrail, from-plan, migrate, apply-scores, set. See the header of this file.");
+  fail("Commands: check, plan, payload, testrail, from-plan, migrate, apply-scores, set, tracker. See the header of this file.");
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) main();

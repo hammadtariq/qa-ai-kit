@@ -61,14 +61,14 @@ jobs:
         continue-on-error: true
         env:
           QA_REPORT_DIR: reports/changed
-        run: npx playwright test --only-changed=origin/${{ github.base_ref }} --grep-invert @quarantine --pass-with-no-tests
+        run: $QA_TEST --only-changed=origin/${{ github.base_ref }} --grep-invert @quarantine --pass-with-no-tests
 
       - name: Smoke tests
         id: smoke
         continue-on-error: true
         env:
           QA_REPORT_DIR: reports/smoke
-        run: npx playwright test --grep @smoke --grep-invert @quarantine --pass-with-no-tests
+        run: $QA_TEST --grep @smoke --grep-invert @quarantine --pass-with-no-tests
 
       - name: Upload results to TestRail
         if: always() && env.TESTRAIL_URL != '' && vars.TESTRAIL_PROJECT_NAME != ''

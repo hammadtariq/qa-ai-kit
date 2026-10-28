@@ -1,10 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 import path from "node:path";
-import { defaultRole, qaConfig } from "./e2e/roles";
+import { defaultRole, qaConfig, qaRoot } from "./e2e/roles";
+
+// Paths start at the repo root (the folder with .qa/config.json), so this config works from the root or from a
+// qa/ folder (standalone mode).
+const root = qaRoot();
 
 // Local runs read .env; CI passes the same names as secrets/variables.
 try {
-  process.loadEnvFile?.(".env");
+  process.loadEnvFile?.(path.join(root, ".env"));
 } catch {
   /* no .env file */
 }
@@ -22,7 +26,27 @@ const localUrl = app.port ? `http://127.0.0.1:${app.port}` : undefined;
 const baseURL = process.env.BASE_URL || localUrl;
 
 // QA_REPORT_DIR lets CI keep two runs apart (PR: changed tests + smoke).
-const reportDir = process.env.QA_REPORT_DIR || "reports";
+const reportDir = path.resolve(root, process.env.QA_REPORT_DIR || "reports");
+
+// Browsers and devices beyond desktop Chrome, from the support promises (discover, area 7):
+//   "browsers": { "devices": ["Desktop Safari", "iPhone 13"], "locales": ["ar-SA"] }
+// Device names are Playwright's (devices in @playwright/test). These projects run only the @smoke tests (the
+// P1 journeys); everything runs on desktop Chrome.
+type QaBrowsers = { devices?: string[]; locales?: string[] };
+const browsers = (qaConfig().browsers ?? {}) as QaBrowsers;
+const signedIn = { storageState: startRole.authFile };
+const extraProjects = [
+  ...(browsers.devices ?? []).map((name) => {
+    if (!devices[name]) throw new Error(`Unknown device "${name}" in .qa/config.json browsers.devices. Use a name from Playwright's devices list, e.g. "Desktop Safari", "iPhone 13", "Pixel 7".`);
+    return { name, use: { ...devices[name], ...signedIn }, grep: /@smoke/, dependencies: ["setup"] };
+  }),
+  ...(browsers.locales ?? []).map((locale) => ({
+    name: `chromium ${locale}`,
+    use: { ...devices["Desktop Chrome"], locale, ...signedIn },
+    grep: /@smoke/,
+    dependencies: ["setup"],
+  })),
+];
 
 export default defineConfig({
   testDir: "./e2e",
@@ -53,6 +77,7 @@ export default defineConfig({
       ? undefined
       : {
           command: process.env.CI ? app.startCommand : app.devCommand || app.startCommand,
+          cwd: root,
           url: `${localUrl}${app.readyPath ?? "/"}`,
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,
@@ -63,9 +88,9 @@ export default defineConfig({
     { name: "setup", testMatch: /.*\.setup\.ts/ },
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"], storageState: startRole.authFile },
+      use: { ...devices["Desktop Chrome"], ...signedIn },
       dependencies: ["setup"],
     },
-    // Add firefox / webkit / mobile projects per client contract, with the same storageState and dependency.
+    ...extraProjects,
   ],
 });

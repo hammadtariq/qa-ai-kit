@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 
 /**
  * Logins per role, from `roles` in .qa/config.json:
@@ -14,10 +15,22 @@ export type QaRole = { name: string; env: string; authFile: string };
 
 type QaConfig = { roles?: Record<string, { env?: string }> | null; defaultRole?: string | null; [key: string]: unknown };
 
+/**
+ * The repo root: the nearest folder above the current one that holds .qa/config.json, so the tests run the
+ * same from the root or from a `qa/` folder (standalone mode, for repos without Node). Paths for .env,
+ * sessions and reports start here.
+ */
+export function qaRoot(): string {
+  for (let dir = process.cwd(); ; dir = path.dirname(dir)) {
+    if (existsSync(path.join(dir, '.qa', 'config.json'))) return dir;
+    if (path.dirname(dir) === dir) return process.cwd();
+  }
+}
+
 /** .qa/config.json, or {} before setup has written it. playwright.config.ts reads `app` from it too. */
 export function qaConfig(): QaConfig {
   try {
-    return JSON.parse(readFileSync('.qa/config.json', 'utf8'));
+    return JSON.parse(readFileSync(path.join(qaRoot(), '.qa', 'config.json'), 'utf8'));
   } catch {
     return {};
   }
@@ -29,7 +42,7 @@ export function qaRoles(): QaRole[] {
   return Object.entries(roles).map(([name, r]) => ({
     name,
     env: r?.env ?? `QA_${name.toUpperCase().replace(/\W+/g, '_')}`,
-    authFile: `playwright/.auth/${name}.json`,
+    authFile: path.join(qaRoot(), 'playwright', '.auth', `${name}.json`),
   }));
 }
 

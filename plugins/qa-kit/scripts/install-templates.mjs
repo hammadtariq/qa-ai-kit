@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Install the QA Kit project templates into a client repo without clobbering anything.
-//   node install-templates.mjs <pluginRoot> <targetDir> [--test-dir=e2e] [--with=antd] [--force=a,b]
+//   node install-templates.mjs <pluginRoot> <targetDir> [--test-dir=e2e] [--with=antd] [--force=a,b] [--standalone]
 //
 // - Plain files are copied only when missing (listed under "skipped" otherwise, for a manual merge).
 // - templates/e2e/** goes to <test-dir>/**, and every "e2e/" path reference is rewritten to match.
@@ -8,6 +8,9 @@
 // - .claude/settings.json is deep-merged into an existing one (arrays de-duplicated, existing keys kept).
 // - gitignore.qa / prettierignore.qa append only the missing lines.
 // - --with=antd (auto-detected from package.json) adds <test-dir>/support/antd.ts and its CLAUDE.md notes.
+// - --standalone (repos without Node): Playwright gets its own qa/ folder with a package.json, the config goes
+//   to qa/playwright.config.ts, tests to qa/e2e, and .qa/ stays at the root. Commands run from the root as
+//   "qa/node_modules/.bin/playwright test -c qa"; the config finds .env, sessions and reports from the root.
 // Prints JSON: { created, merged, skipped, detected } so the caller knows what to finish by hand.
 
 import { readdirSync, statSync, mkdirSync, copyFileSync, existsSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
@@ -20,12 +23,18 @@ const flag = (name, dflt) => {
 };
 const [pluginRoot, dest = "."] = args.filter((a) => !a.startsWith("--"));
 if (!pluginRoot) {
-  console.error("usage: install-templates.mjs <pluginRoot> <targetDir> [--test-dir=e2e] [--with=antd] [--force=a,b]");
+  console.error("usage: install-templates.mjs <pluginRoot> <targetDir> [--test-dir=e2e] [--with=antd] [--force=a,b] [--standalone]");
   process.exit(1);
 }
 const src = join(pluginRoot, "templates");
 const extrasRoot = join(pluginRoot, "template-extras");
-const testDir = flag("test-dir", "e2e").replace(/^\.\//, "").replace(/\/+$/, "");
+const standalone = args.includes("--standalone");
+// Where Playwright's package.json and config live: the root, or qa/ in standalone mode.
+const pwDir = standalone ? "qa" : ".";
+const testDir = flag("test-dir", standalone ? "qa/e2e" : "e2e").replace(/^\.\//, "").replace(/\/+$/, "");
+// The test folder as the Playwright config sees it (relative to the config's folder).
+const configTestDir = relative(pwDir, testDir).split("\\").join("/");
+const PW = standalone ? "qa/node_modules/.bin/playwright" : "npx playwright";
 const force = new Set(flag("force", "").split(",").filter(Boolean));
 
 // ---------------------------------------------------------------- detect
@@ -48,6 +57,7 @@ const detected = {
   unitRunner: deps.vitest ? "vitest" : deps.jest || pkg.jest ? "jest" : null,
   scripts: Object.keys(pkg.scripts || {}),
   testDir,
+  standalone,
 };
 const extras = new Set(flag("with", detected.antd ? "antd" : "").split(",").filter(Boolean));
 
@@ -63,14 +73,21 @@ const walk = (dir) =>
     return statSync(p).isDirectory() ? walk(p) : [p];
   });
 
-// Rewrite "e2e/" references when the repo uses another test folder.
-const retarget = (text) =>
-  testDir === "e2e"
+// Rewrite "e2e/" references when the repo uses another test folder (`to`: as seen from the file's folder).
+const retarget = (text, to = testDir) =>
+  to === "e2e"
     ? text
     : text
-        .replace(/testDir: "\.\/e2e"/g, `testDir: "./${testDir}"`)
-        .replace(/"testDir": "e2e"/g, `"testDir": "${testDir}"`)
-        .replace(/(^|[\s`'"(])(\.\/)?e2e\//g, `$1$2${testDir}/`);
+        .replace(/testDir: "\.\/e2e"/g, `testDir: "./${to}"`)
+        .replace(/"testDir": "e2e"/g, `"testDir": "${to}"`)
+        .replace(/(^|[\s`'"(])(\.\/)?e2e\//g, `$1$2${to}/`);
+// Standalone: commands in docs and permissions run the qa/ folder's Playwright with its config.
+const commands = (text) =>
+  standalone
+    ? text
+        .replace(/npx playwright test/g, `${PW} test -c qa`)
+        .replace(/npx playwright (show-report|install)/g, `${PW} $1`)
+    : text;
 const TEXT = /\.(md|ts|js|mjs|json|ya?ml|sh|example|qa)$/;
 
 function writeFile(rel, content, mode) {
@@ -80,11 +97,11 @@ function writeFile(rel, content, mode) {
   if (mode) chmodSync(target, mode);
 }
 
-function appendMissingLines(srcFile, targetRel, header, { onlyIfExists = false } = {}) {
+function appendMissingLines(srcFile, targetRel, header, { onlyIfExists = false, extra = [] } = {}) {
   const target = join(dest, targetRel);
   if (onlyIfExists && !existsSync(target)) return;
   const have = existsSync(target) ? readFileSync(target, "utf8").split(/\r?\n/) : [];
-  const want = readFileSync(srcFile, "utf8").split(/\r?\n/).filter((l) => l.trim() && !have.includes(l));
+  const want = [...readFileSync(srcFile, "utf8").split(/\r?\n/), ...extra].filter((l) => l.trim() && !have.includes(l));
   if (!want.length) return;
   const base = have.join("\n").replace(/\n*$/, "");
   writeFile(targetRel, `${base}${base ? "\n\n" : ""}${header}\n${want.join("\n")}\n`);
@@ -126,12 +143,17 @@ const SPECIAL = new Set(["CLAUDE.qa.md", "gitignore.qa", "prettierignore.qa", ".
 for (const file of walk(src)) {
   const rel = relative(src, file).split("\\").join("/");
   if (SPECIAL.has(rel)) continue;
-  const outRel = rel.startsWith("e2e/") ? `${testDir}/${rel.slice(4)}` : rel;
+  const outRel = rel.startsWith("e2e/") ? `${testDir}/${rel.slice(4)}` : rel === "playwright.config.ts" ? `${pwDir}/${rel}`.replace(/^\.\//, "") : rel;
   if (existsSync(join(dest, outRel)) && !force.has(outRel) && !force.has(rel)) {
     skipped.push(outRel);
     continue;
   }
-  if (TEXT.test(rel)) writeFile(outRel, retarget(readFileSync(file, "utf8")), rel.endsWith(".sh") ? 0o755 : undefined);
+  if (TEXT.test(rel)) {
+    let text = readFileSync(file, "utf8");
+    text = rel === "playwright.config.ts" ? retarget(text, configTestDir) : retarget(text);
+    if (rel === ".qa/config.json" && standalone) text = text.replace(/"playwrightDir": "\."/, `"playwrightDir": "${pwDir}"`);
+    writeFile(outRel, commands(text), rel.endsWith(".sh") ? 0o755 : undefined);
+  }
   else {
     mkdirSync(dirname(join(dest, outRel)), { recursive: true });
     copyFileSync(file, join(dest, outRel));
@@ -145,10 +167,21 @@ for (const extra of extras) {
   const notes = join(extrasRoot, extra, `CLAUDE.${extra}.md`);
   if (existsSync(notes)) block = block.replace(/\n### What needs a person/, `\n${readFileSync(notes, "utf8").trim()}\n\n### What needs a person`);
 }
-upsertClaudeMd(retarget(block));
+upsertClaudeMd(commands(retarget(block)));
+
+// Standalone: Playwright's own package.json in qa/ (setup installs it there).
+if (standalone) {
+  const qaPkg = join(pwDir, "package.json");
+  if (existsSync(join(dest, qaPkg))) skipped.push(qaPkg);
+  else {
+    const name = `${(pkg.name || dest.split(/[\\/]/).filter(Boolean).pop() || "app").replace(/[^\w.-]/g, "-").toLowerCase()}-qa`;
+    writeFile(qaPkg, JSON.stringify({ name, private: true, scripts: { test: "playwright test" }, devDependencies: { "@playwright/test": "^1.64.1", "@types/node": "^22.0.0" } }, null, 2) + "\n");
+    created.push(qaPkg);
+  }
+}
 
 // .claude/settings.json
-const settingsSrc = readJson(join(src, ".claude/settings.json"));
+const settingsSrc = JSON.parse(commands(readFileSync(join(src, ".claude/settings.json"), "utf8")));
 const settingsTarget = join(dest, ".claude/settings.json");
 if (existsSync(settingsTarget)) {
   const current = readJson(settingsTarget);
@@ -162,8 +195,9 @@ if (existsSync(settingsTarget)) {
   created.push(".claude/settings.json");
 }
 
-appendMissingLines(join(src, "gitignore.qa"), ".gitignore", "# QA Kit");
-appendMissingLines(join(src, "prettierignore.qa"), ".prettierignore", "# QA Kit", { onlyIfExists: true });
+const qaModules = standalone ? [`${pwDir}/node_modules/`] : [];
+appendMissingLines(join(src, "gitignore.qa"), ".gitignore", "# QA Kit", { extra: qaModules });
+appendMissingLines(join(src, "prettierignore.qa"), ".prettierignore", "# QA Kit", { onlyIfExists: true, extra: qaModules });
 
 // Extras: files go under the test folder.
 for (const extra of extras) {

@@ -1,7 +1,8 @@
 ## QA conventions (QA Kit, Playwright E2E)
 
-This repo uses the agency QA Kit: Playwright test agents write and heal end-to-end tests, TestRail is
-the system of record, and people review at five gates. Follow these rules in every session.
+This repo uses the agency QA Kit: Playwright test agents write and heal end-to-end tests, the cases CSV
+(and TestRail, when `tracker` in `.qa/config.json` is `testrail`) is the system of record, and people
+review at five gates. Follow these rules in every session.
 
 ### App under test
 
@@ -36,20 +37,29 @@ the system of record, and people review at five gates. Follow these rules in eve
 - **Cases live in `specs/cases/<feature>.csv`, one row per case** (format: `specs/cases/README.md`). Edit the
   CSV, never the generated block in `specs/<feature>.md`; regenerate it with
   `node .qa/scripts/cases.mjs plan <csv>` and validate with `node .qa/scripts/cases.mjs check <csv>`.
-  The reviewer's `decision` column is Gate 1; only `Keep` rows reach TestRail, through `/qa-kit:push-cases`.
+  The reviewer's `decision` column is Gate 1; with TestRail, only `Keep` rows reach it, through
+  `/qa-kit:push-cases`. `node .qa/scripts/cases.mjs tracker` says which tracker this repo uses.
 
 ### Writing tests
 
 - Tests live in `e2e/<area>/<feature>.spec.ts`. Import `test`, `expect` and `tr` from `e2e/fixtures.ts`.
   `e2e/seed.spec.ts` is the seed for the planner and generator agents.
-- Every test links to its TestRail case: `test('title', { annotation: tr('C1234') }, async ({ page }) => { ... })`.
-  Results reach TestRail only through this annotation. Don't put the case id in the title.
+- Every test links to its case: `test('title', { annotation: tr('C1234') }, async ({ page }) => { ... })` with
+  the TestRail id, or `tr('PO-07')` with the CSV row's key when there is no tracker. Results reach TestRail
+  only through this annotation. Don't put the case id in the title.
 - P1 cases get `tag: '@smoke'`. Flaky tests under investigation get `'@quarantine'` (skipped in CI).
 - Locators, in order of preference: `getByRole`, `getByLabel`, `getByText`, `getByTestId`. No XPath, no long CSS chains.
 - Assert the business outcome (record created, total correct, error shown), not only that a page loaded.
   Use `toMatchAriaSnapshot` for regions whose structure matters.
 - No `waitForTimeout`, `page.pause()` or `test.only`. Rely on auto-waiting and web-first assertions.
-- Seed data through the API (`request` fixture) rather than long UI setup.
+- Test data through the `data` fixture: `data.create('/api/suppliers', { name: data.name('Supplier') })`
+  creates it through the API with a name unique to the run and worker, and deletes it after the test. Never
+  change shared seed records; records the app can't delete live in a per-run organization.
+- Outside services: payments in the provider's test mode, emails and SMS from the test inbox
+  (`mailbox` helper in `e2e/support/`, when installed), anything else stubbed with `page.route` and a comment
+  saying what the stub hides. Never live keys.
+- Dates and time with `page.clock` (month end, expiry, renewals) and `timezoneId` / `locale`, never by
+  waiting or editing data.
 - Permission cases: in one test, the lower role through the UI (`asRole`) and by a direct request (`apiAs`);
   both refused, and nothing changed. `level: api` cases use `request` / `apiAs` only, no page.
 - Check your work with `node .qa/scripts/lint-specs.mjs <files>` and run new tests with `--repeat-each=3`.
@@ -78,4 +88,6 @@ the system of record, and people review at five gates. Follow these rules in eve
 ### Commands
 
 - `npx playwright test` · `npx playwright test --grep @smoke` · `npx playwright show-report reports/html`
+- Extra browsers and devices (`browsers` in `.qa/config.json`) run only the `@smoke` tests; `--project=chromium`
+  runs desktop Chrome alone.
 - Kit skills: `/qa-kit:discover`, `/qa-kit:plan-feature`, `/qa-kit:review-cases`, `/qa-kit:push-cases`, `/qa-kit:generate-tests`, `/qa-kit:triage`, `/qa-kit:digest`, `/qa-kit:upkeep`, `/qa-kit:client-report`
