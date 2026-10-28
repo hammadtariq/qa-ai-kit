@@ -98,8 +98,9 @@ Postmark, SMTP), SMS, sign-in providers (Google, Auth0, Okta), ERPs and accounti
 - For each one: "Is there a test or sandbox mode we can use?" Options: "Yes, and staging uses it
   (Recommended)" when config suggests so, "Yes, but not set up", "No, only live", "Not sure".
 
-**Answered when:** each service with its test-mode status. Tests never use live keys; services with no
-sandbox are stubbed, and the case's notes say what the stub hides.
+**Answered when:** each service with its test-mode status and how tests will deal with it: test mode
+(payments: the provider's test cards), test inbox (email, SMS), or stub. Tests never use live keys;
+services with no sandbox are stubbed, and the case's notes say what the stub hides.
 
 ## 7. What the team promises to support [Support promises]
 
@@ -110,7 +111,8 @@ sandbox are stubbed, and the case's notes say what the stub hides.
   iPhone", "Chrome on Android", "Edge / Firefox on desktop".
 - Only if the code shows more than one: "Which languages, currencies or time zones are in use?"
 
-**Answered when:** browsers and devices, and languages, currencies and time zones when relevant.
+**Answered when:** browsers and devices, and languages, currencies and time zones when relevant. Anything
+beyond desktop Chrome becomes `browsers` in `.qa/config.json` (the P1 journeys run on each).
 
 ## 8. What tests already cover [Existing test coverage]
 

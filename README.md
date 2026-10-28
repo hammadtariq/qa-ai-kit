@@ -2,14 +2,16 @@
 
 A Claude Code plugin that adds an AI-assisted QA process to any web-app repo. Claude writes test cases from a
 ticket, turns them into Playwright tests, fixes broken tests and sorts CI failures. TestRail keeps the
-official record, and a person approves the work at five checkpoints ("gates") before anything ships.
+official record (or, without TestRail, the cases CSV does), and a person approves the work at five
+checkpoints ("gates") before anything ships. It works on Node and non-Node repos alike.
 
 ## Getting started
 
 ### 1. One-time setup (once for the whole agency)
 
 Follow [docs/AGENCY-SETUP.md](docs/AGENCY-SETUP.md): turn on the TestRail API and add two custom fields,
-create a CI Claude account, and add the GitHub secrets. Skip this if someone has already done it.
+create a CI Claude account, and add the GitHub secrets. Skip this if someone has already done it. Projects
+without TestRail skip the TestRail parts.
 
 ### 2. Install the plugin (once per person)
 
@@ -32,11 +34,14 @@ Open the project's repo in Claude Code, with a clean git tree, and run:
 /qa-kit:setup-project <testrail-project-id>
 ```
 
-It works on a new `qa-kit/setup` branch and asks you two questions:
+Leave out the id on a project without TestRail. It works on a new `qa-kit/setup` branch and asks you up to
+three questions:
 
-- **Where tests live**: `e2e/` by default.
+- **Where tests live**: `e2e/` by default. A repo without `package.json` (Rails, Django, Laravel, Go...) gets
+  **standalone mode**: Playwright in its own `qa/` folder, the app untouched.
 - **How tests reach the app**: a **staging** URL with test accounts, or the **local app** (Playwright starts
-  this checkout, and CI builds it against throwaway databases). Production is never used.
+  this checkout with any shell command, and CI builds it against throwaway databases). Production is never used.
+- **Where cases live**: TestRail, or **none** (the cases CSV is the record and tests carry the row's key).
 
 It then adds the Playwright config, test helpers, CI workflows and a `.qa/` folder (see
 [What a project gets](#what-a-project-gets)). At the end it offers to interview the product owner (next
@@ -45,7 +50,8 @@ step). Before merging that branch:
 1. Copy `qa.env.example` into your `.env` and fill it in (test logins, one per role if the app has several;
    TestRail user and API key).
 2. Add the per-repo GitHub variables and secrets listed in AGENCY-SETUP section 4, and create the `qa:*` labels.
-3. Confirm `npx playwright test --project=setup` passes (the login works).
+3. Confirm `npx playwright test --project=setup` passes (the login works). In standalone mode:
+   `qa/node_modules/.bin/playwright test -c qa --project=setup`.
 
 ### 4. Tell it about the business (the product owner, once per repo)
 
@@ -75,9 +81,9 @@ below.
 | Step | You run | Then a person… |
 | --- | --- | --- |
 | 1. Plan cases | `/qa-kit:plan-feature <ticket>` → `specs/cases/<feature>.csv` | **Gate 1**: reviews the CSV in any spreadsheet |
-| 2. Send to TestRail | `/qa-kit:push-cases specs/cases/<feature>.csv` | QA lead bulk-approves the AI drafts in TestRail |
-| 3. Write tests | `/qa-kit:generate-tests <section, plan or case ids>` | **Gate 2**: reviews the test PR |
-| 4. CI runs them | automatic on each PR and nightly; results go to TestRail | – |
+| 2. Send to TestRail | `/qa-kit:push-cases specs/cases/<feature>.csv` (skipped without TestRail) | QA lead bulk-approves the AI drafts in TestRail |
+| 3. Write tests | `/qa-kit:generate-tests <CSV, section, plan or case ids>` | **Gate 2**: reviews the test PR |
+| 4. CI runs them | automatic on each PR and nightly; results go to TestRail when it's used | – |
 | 5. Failures | `/qa-kit:triage nightly \| pr <n>` (CI runs it for you) | **Gates 3–4**: handles escalations and bug drafts; reviews fix PRs |
 | 6. Release | `/qa-kit:digest` (also posted to Slack) | **Gate 5**: signs off the release |
 
@@ -128,10 +134,14 @@ CSVs from before 0.6.0 (numbered steps and expected results) keep working; `case
 
 ## What a project gets
 
-- `playwright.config.ts` with JSON and JUnit reports, isolated retries and a saved login.
-- `e2e/`: `fixtures.ts` (the `tr('C123')` TestRail helper, and `asRole` / `apiAs` for acting as another role),
-  `auth.setup.ts` and `roles.ts` (one saved login per role), `seed.spec.ts`, plus
-  Ant Design helpers if the app uses antd.
+- `playwright.config.ts` with JSON and JUnit reports, isolated retries and a saved login. Extra browsers,
+  phones and languages from the owner's support promises (`browsers` in `.qa/config.json`) run the P1 journeys.
+- `e2e/`: `fixtures.ts` (the `tr('C123')` case helper, `asRole` / `apiAs` for acting as another role, and
+  `data` for test data that deletes itself after each test), `auth.setup.ts` and `roles.ts` (one saved login
+  per role), `seed.spec.ts`, plus Ant Design helpers if the app uses antd and a Mailpit `mailbox` helper for
+  reading the app's emails (`--with=mailpit`).
+- In standalone mode the same files sit in `qa/` (`qa/playwright.config.ts`, `qa/e2e/`), with their own
+  `package.json`; `.qa/` stays at the root.
 - QA rules appended to `CLAUDE.md`; the plugin and permissions merged into `.claude/settings.json`.
 - `.qa/`: `config.json`, `business-context.md`, `glossary.md`, `app-setup.sh` (CI app prep: database, seed, build) and
   helper scripts (cases CSV, lint, failure extraction, flaky history, Slack digest, a browser watchdog).
@@ -154,6 +164,7 @@ test('shows an error for an expired coupon', { annotation: tr('C1234'), tag: '@s
 ```
 
 Results land on the existing case C1234; no stray cases are created. Keep case ids out of test titles.
+Without TestRail, use the CSV row's key instead (`tr('CO-04')`); the weekly upkeep matches tests to rows by key.
 
 ## Cost
 

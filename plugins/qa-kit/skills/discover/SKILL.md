@@ -81,9 +81,24 @@ them. `plan-feature` will not use `(assumed)` facts to justify a P1.
 - **Areas and risk tiers:** one row per product area (purchases, billing, bookings...) with `low`,
   `medium` or `high` and the reason. High: money, access or data loss is possible there. Medium: wrong but
   recoverable. Low: cosmetic or rarely used. The case budget per feature comes from this tier.
+- **Outside services:** the "In tests" column says how tests deal with each one (playbook section 8):
+  `test mode` (payments with test cards), `test inbox` (email and SMS, Mailpit or Mailosaur), `stub`
+  (anything with no sandbox), or `unknown`.
 - Keep it to about one page. It's read before every plan.
 
-## 4. Write the glossary
+## 4. Settings from the answers
+
+- **Browsers and devices (area 7):** if the owner named more than desktop Chrome, set `.qa/config.json` →
+  `browsers` with Playwright's device names and locales, e.g.
+  `{ "devices": ["Desktop Safari", "iPhone 13"], "locales": ["ar-SA"] }` (Safari on iPhone → `"iPhone 13"`,
+  Chrome on Android → `"Pixel 7"`, Safari on desktop → `"Desktop Safari"`, Firefox → `"Desktop Firefox"`,
+  Edge → `"Desktop Edge"`). These run the P1 journeys (`@smoke`); everything runs on desktop Chrome.
+- **Email or SMS through a test inbox (area 6):** if the project has no `<testDir>/support/mailbox.ts`, tell
+  the user to re-run the installer with `--with=mailpit` (see `/qa-kit:setup-project` step 4).
+- **Cleanup (area 10):** "create only" or "separate test organization" means tests can't delete what they
+  make; note it under Test environment and data so plans use a per-run organization (playbook section 8).
+
+## 5. Write the glossary
 
 `.qa/glossary.md` (template: `${CLAUDE_PLUGIN_ROOT}/templates/.qa/glossary.md`): about 15 business terms
 with a one-line meaning in the owner's words, the words to avoid for each ("Order", not "transaction
@@ -91,7 +106,7 @@ record"), and the names used in examples (people and records that appear in case
 models, page titles and the owner's own answers; ask one question to confirm the list and the avoided
 words. `cases.mjs check` warns when a case uses an avoided word or a capitalised word that isn't here.
 
-## 5. Finish
+## 6. Finish
 
 - Show the user a short summary: the top disasters as rules, the high-risk areas, anything still
   `(assumed)`, and the open questions.

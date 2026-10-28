@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.8.0 (2026-10-28): works on any project
+
+Phase 3 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, tests shared seed data, the kit had
+no pattern for email, payments or dates, setup stopped on a repo without `package.json`, TestRail was
+assumed, and only desktop Chrome ran.
+
+- **Test data that cleans up after itself**: a `data` fixture in `fixtures.ts`.
+  `data.create('/api/suppliers', { name: data.name('Supplier') })` creates a record through the app's API,
+  with a name unique to the run and worker, and deletes it when the test ends (last first; a failed delete is
+  a "cleanup" annotation, not a failure). `remove: false` for records the app never deletes, inside a per-run
+  organization. The playbook (new section 8) and `generate-tests` use it instead of ad-hoc setup.
+- **Outside services, dates and time**: playbook section 8 and `generate-tests` rules: payments in the
+  provider's test mode with its test cards, emails and SMS from a test inbox, anything else stubbed with
+  `page.route` and a note on what the stub hides, dates with `page.clock`. New optional extra
+  `--with=mailpit`: `<testDir>/support/mailbox.ts`, `mailbox(request).latest(to, { subject, since })` reads
+  a Mailpit inbox and returns the text and links. Discover records how tests treat each service ("In tests"
+  column).
+- **Repos without Node (standalone mode)**: `install-templates.mjs --standalone` puts Playwright in `qa/`
+  with its own `package.json`, the config in `qa/playwright.config.ts` and tests in `qa/e2e/`; `.qa/` stays
+  at the root (`"playwrightDir": "qa"`). The config finds the repo root, so `.env`, sessions and reports stay
+  there whether tests run from the root (`qa/node_modules/.bin/playwright test -c qa`) or from `qa/`.
+  `patch-agents.mjs` points the agents' MCP server at `qa/`. `app.startCommand` can be any shell command
+  (`bin/rails server -p 3100`). Checked on a small Python app: setup, tests from both folders, CI mode, the
+  MCP server listing the tests.
+- **Tracker as a setting**: `.qa/config.json` → `tracker`, `"testrail"` or `"none"` (default: TestRail when
+  `testrail.projectId` is set). With `none`, `push-cases` stops with a pointer to `generate-tests`, tests
+  carry the CSV key (`tr('PO-07')`), `lint-specs` accepts keys (and warns on a key when the tracker is
+  TestRail), `collect-test-ids` lists keys, upkeep, digest and client-report work from the CSVs and the
+  nightly reports. `node .qa/scripts/cases.mjs tracker` prints the setting for skills and scripts.
+- **Browsers and devices from the contract**: `.qa/config.json` → `browsers`, e.g.
+  `{ "devices": ["Desktop Safari", "iPhone 13"], "locales": ["ar-SA"] }`. Each adds a Playwright project that
+  runs the `@smoke` tests (the P1 journeys); everything else stays on desktop Chrome. Discover (area 7) fills
+  it; the CI action installs the browsers those devices need (`browsers: auto`).
+- CI: the app-setup action installs Node dependencies where Playwright lives and exports `QA_TEST`, the
+  test command the workflows now run.
+
+Upgrading from 0.7.x:
+
+1. `/plugin marketplace update qa-ai-kit`.
+2. Copy from `templates/`: `.qa/scripts/` (all of it), `e2e/roles.ts` and `e2e/fixtures.ts` into your test
+   folder (keep any fixtures you added), and `.github/actions/qa-app-setup/action.yml`.
+3. In `playwright.config.ts`, take from the template: the `qaRoot` import and `root`, the `.env` and
+   `reportDir` lines, `cwd: root` in `webServer`, and the `browsers` block with `...extraProjects`.
+4. In both workflows, replace `npx playwright test` in `run:` lines with `$QA_TEST`, and drop
+   `browsers: chromium` from the nightly's app-setup step.
+5. Nothing else changes for a TestRail project: without `tracker`, a set `testrail.projectId` still means
+   TestRail. A project without TestRail: set `"tracker": "none"`.
+6. Optional: `browsers` for extra devices; `--with=mailpit` for the email helper.
+
 ## 0.7.0 (2026-10-27): fewer, stronger cases
 
 Phase 2 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, the model that wrote the cases also

@@ -32,8 +32,8 @@ never deletes anything and never edits specs. Rewriting rows waits for the user'
 ## 1. Read the cases
 
 - **CSV** (the argument, or `specs/cases/<feature>.csv` for the feature named): it is the source.
-  `node .qa/scripts/cases.mjs check <csv>` gives the counts and the risk coverage. If TestRail is
-  configured, also read the section (below) to spot drift: cases in TestRail that no row mentions, or
+  `node .qa/scripts/cases.mjs check <csv>` gives the counts and the risk coverage. With TestRail
+  (`node .qa/scripts/cases.mjs tracker` prints `testrail`), also read the section (below) to spot drift: cases in TestRail that no row mentions, or
   text that differs.
 - **TestRail section, no CSV yet**: `testrail_status` (its `warnings` must be empty), then
   `testrail_get_sections` to find the section, and `testrail_get_cases` with `section_id` and

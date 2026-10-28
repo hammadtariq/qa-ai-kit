@@ -1,7 +1,7 @@
 # QA Kit improvement plan
 
-Status: **Phases 1-2 built (0.6.0, 0.7.0)**, with the recommended answer for every decision below. Phases 3-4 are
-still drafts: mark up any you want changed before work starts.
+Status: **Phases 1-3 built (0.6.0, 0.7.0, 0.8.0)**, with the recommended answer for every decision below. Phase 4
+is still a draft: mark up anything you want changed before work starts.
 
 ## Why
 
@@ -309,6 +309,12 @@ Discover (area 6) records which of these each project has.
 Discover (area 7) records the browsers, mobile sizes and languages; `setup-project` adds the matching
 Playwright projects (`webkit`, `Mobile Safari`, a locale project) instead of Chromium only. P1 journeys run
 on all of them; the rest on Chromium.
+
+As built (0.8.0), with small changes from the draft above: names from `data.name()` use the worker index
+(unique even when a worker restarts) rather than `parallelIndex`; the `mailbox` helper is an install extra
+(`--with=mailpit`); browsers are a `browsers` setting the config turns into projects, so setup edits JSON, not
+TypeScript; standalone commands run from the root as `qa/node_modules/.bin/playwright test -c qa`, and the CI
+action exports them as `QA_TEST` instead of setting `working-directory`.
 
 ### Done when
 

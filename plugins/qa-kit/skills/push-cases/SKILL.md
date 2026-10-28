@@ -9,6 +9,11 @@ disable-model-invocation: true
 
 Cases file: `$ARGUMENTS` (if empty, list `specs/cases/*.csv` and ask which one).
 
+First run `node .qa/scripts/cases.mjs tracker`. If it prints `none`, there is nothing to push: the CSV is the
+record, the reviewer's `Keep` is the approval, and tests carry the row's key. Say so and point to
+`/qa-kit:generate-tests <csv>`. (To start using TestRail, set `"tracker": "testrail"` and `testrail.projectId`
+in `.qa/config.json`, then run this again.)
+
 The CSV is the source of truth for case design and the reviewer's `decision` column is the Gate 1
 review. This skill copies the result to TestRail. It never approves cases: pushed cases arrive as
 **AI draft**, and the QA lead bulk-approves them in TestRail (select the section's cases → Edit Selected

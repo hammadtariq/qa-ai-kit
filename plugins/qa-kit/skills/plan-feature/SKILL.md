@@ -60,7 +60,8 @@ questions as one comment with `gh issue comment` (or give them to the user) and 
 
 ## 2. Avoid duplicates
 
-Read any existing `specs/cases/*.csv` for this area. If TestRail is configured, also call `testrail_status`
+Read any existing `specs/cases/*.csv` for this area. With TestRail (`node .qa/scripts/cases.mjs tracker`
+prints `testrail`), also call `testrail_status`
 (its `warnings` must be empty; fix `.qa/config.json` first if not), then `testrail_get_sections` and
 `testrail_get_cases` for the closest section. Note existing cases that
 already cover parts of this feature; the new set adds to them, it doesn't repeat them. If the existing

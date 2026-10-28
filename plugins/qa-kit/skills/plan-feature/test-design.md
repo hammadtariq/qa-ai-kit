@@ -233,7 +233,33 @@ Scenario: Approving an order puts it on this month's revenue report
   And order A-17 is listed on it
 ```
 
-## 8. Review before handing over
+## 8. Test data, outside services and time
+
+The case stays in business words; these choices go in `notes`, so `generate-tests` knows how to set it up.
+
+**Test data cleans up after itself.** Each test creates what it needs through the app's API with the `data`
+fixture (`data.create(...)`, names from `data.name(...)`, unique per run and worker) and it is deleted when
+the test ends. Shared seed accounts are for logging in, never for records a test changes. When the app
+can't delete a record (ledger entries, audit logs, issued invoices), don't fake it: give the test run its
+own organization or tenant (created per run, with `remove: false` on the records inside it), and say so in
+`notes`. Discover (area 10) records which of these the project allows.
+
+**Outside services** (discover, area 6, records what each project has):
+
+| Service | In tests | `notes` example |
+| --- | --- | --- |
+| Payments | The provider's test mode and its published test cards; never live keys | "Stripe test mode, card 4000 0000 0000 9995 (declined: insufficient funds)" |
+| Email, SMS | A test inbox: Mailpit locally or in CI, Mailosaur or similar on staging; the `mailbox` helper reads it | "Mailpit; assert the refund email to Ali shows 5,000" |
+| Anything else without a sandbox (ERP, shipping rates, webhooks) | Stub the call with `page.route`, and say what the stub hides | "Shipping rates stubbed at 250; doesn't prove the courier API still answers" |
+
+A stub proves the app handles the answer, not that the service still gives it. A P1 case that depends on
+a stubbed service says so in `notes`, and the gap goes in the plan's coverage notes.
+
+**Dates and time.** Never wait for a date or edit data to fake one. Set the clock with `page.clock`
+(month end, plan renewal, an expiry, a time zone's midnight) and write the date into the scenario
+("Given today is 31 January"). The `timezoneId` and `locale` options cover time zones and formats.
+
+## 9. Review before handing over
 
 Re-read the full set as the business owner would, and answer in the Gate 1 summary:
 
