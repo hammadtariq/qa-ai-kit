@@ -43,8 +43,10 @@ for (const file of files) {
         ? `"${t.title}" has no TestRail id. Add { annotation: tr('C123') } so its result reaches TestRail`
         : `"${t.title}" has no case key. Add { annotation: tr('PO-07') } with its row's key in specs/cases/`);
     }
-    for (const id of t.caseIds.filter((x) => tracker === 'testrail' && !isTestRailId(x))) {
-      add('warn', file, t.line, 'test-id', `"${t.title}" links to ${id}, a CSV key; push the case (/qa-kit:push-cases) and use its TestRail id so the result reaches TestRail`);
+    if (tracker === 'testrail') {
+      for (const id of t.caseIds.filter((x) => !isTestRailId(x))) {
+        add('warn', file, t.line, 'test-id', `"${t.title}" links to ${id}, a CSV key; push the case (/qa-kit:push-cases) and use its TestRail id so the result reaches TestRail`);
+      }
     }
     if (!t.hasAssertion && !t.fixme && t.modifier !== 'skip') {
       add('warn', file, t.line, 'assertion', `"${t.title}" has no expect(...). Assert the business outcome, not just that steps ran`);

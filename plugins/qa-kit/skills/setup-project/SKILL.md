@@ -53,8 +53,7 @@ agree a local or staging database with the user first.
 - If `@playwright/test` is missing or older than 1.62, install the latest with the repo's package
   manager (`npm i -D` / `pnpm add -D` / `yarn add -D @playwright/test@latest`), then
   `npx playwright install chromium`. 1.62+ is needed for `retryStrategy: 'isolated'`.
-- Standalone mode: skip this step; step 4 writes `qa/package.json`, then run
-  `npm install --prefix qa` and `qa/node_modules/.bin/playwright install chromium`.
+- Standalone mode: skip this step; step 4 installs Playwright in `qa/`.
 
 ## 4. Templates
 
@@ -73,7 +72,9 @@ It prints JSON with `created`, `merged`, `skipped` and `detected` (package manag
 - Standalone: `qa/package.json`, `qa/playwright.config.ts` and the tests in `qa/e2e/`; `.qa/config.json` gets
   `"playwrightDir": "qa"`, and the commands in `CLAUDE.md` and `.claude/settings.json` become
   `qa/node_modules/.bin/playwright test -c qa`. They run from the repo root; `.env`, sessions and reports
-  stay at the root.
+  stay at the root. Now install Playwright there: `npm install --prefix qa` (it writes
+  `qa/package-lock.json`; commit it, CI's `npm ci` and cache need it), then
+  `qa/node_modules/.bin/playwright install chromium`.
 - For each `skipped` file, merge by hand. For an existing `playwright.config.ts`, keep the repo's
   projects and add from the template: the four reporters (list, html in `reports/html`, json in
   `reports/results.json`, junit with `embedAnnotationsAsProperties: true`), `retryStrategy: 'isolated'`,
@@ -101,7 +102,8 @@ comes from this plugin, so it does not need to be in `.mcp.json`. If `init-agent
 ## 6. Fill in the project specifics
 
 - `.env`: you can't read it (project settings deny it, on purpose). Check what's set with
-  `node -e "try{process.loadEnvFile('.env')}catch{};const c=JSON.parse(require('fs').readFileSync('.qa/config.json','utf8'));const roles=Object.keys(c.roles||{}).length?c.roles:{user:{env:'QA_USER'}};const r=Object.entries(roles).flatMap(([n,v])=>{const e=v?.env||'QA_'+n.toUpperCase().replace(/\\W+/g,'_');return[e+'_EMAIL',e+'_PASSWORD']});for(const k of ['BASE_URL',...r,'TESTRAIL_URL','TESTRAIL_USER','TESTRAIL_API_KEY'])console.log(k, process.env[k]?'set':'MISSING')"`
+  `node --input-type=module -e "import {loadQaConfig,trackerOf} from './.qa/scripts/lib/specs.mjs';try{process.loadEnvFile('.env')}catch{};const c=loadQaConfig();const roles=Object.keys(c.roles||{}).length?c.roles:{user:{env:'QA_USER'}};const r=Object.entries(roles).flatMap(([n,v])=>{const e=v?.env||'QA_'+n.toUpperCase().replace(/\\W+/g,'_');return[e+'_EMAIL',e+'_PASSWORD']});const t=trackerOf(c)==='testrail'?['TESTRAIL_URL','TESTRAIL_USER','TESTRAIL_API_KEY']:[];for(const k of ['BASE_URL',...r,...t])console.log(k, process.env[k]?'set':'MISSING')"`
+  (the `TESTRAIL_*` lines appear only with tracker `testrail`)
   and ask the user to fill anything missing from `qa.env.example`. In local-app mode also confirm the
   app's own database variables point at a local database, not production.
 - **Local-app mode:**

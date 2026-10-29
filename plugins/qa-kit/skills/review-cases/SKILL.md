@@ -17,6 +17,9 @@ TestRail: this skill writes its verdicts to the `suggestion` column, the reviewe
 `/qa-kit:push-cases` copies the result to TestRail. It never fills `decision`, never approves cases,
 never deletes anything and never edits specs. Rewriting rows waits for the user's yes.
 
+Run `node .qa/scripts/cases.mjs tracker` once. **With `none`, skip every TestRail step and count below**: the
+CSV is the only record, there is no `testrail_id`, and after the reviewer's decisions the CSV is final.
+
 ## 0. Load the yardsticks
 
 - `.qa/business-context.md`: what must never go wrong, the rules, real usage, known gaps. If it is
@@ -32,10 +35,10 @@ never deletes anything and never edits specs. Rewriting rows waits for the user'
 ## 1. Read the cases
 
 - **CSV** (the argument, or `specs/cases/<feature>.csv` for the feature named): it is the source.
-  `node .qa/scripts/cases.mjs check <csv>` gives the counts and the risk coverage. With TestRail
-  (`node .qa/scripts/cases.mjs tracker` prints `testrail`), also read the section (below) to spot drift: cases in TestRail that no row mentions, or
+  `node .qa/scripts/cases.mjs check <csv>` gives the counts and the risk coverage. With TestRail,
+  also read the section (below) to spot drift: cases in TestRail that no row mentions, or
   text that differs.
-- **TestRail section, no CSV yet**: `testrail_status` (its `warnings` must be empty), then
+- **TestRail section, no CSV yet** (TestRail only): `testrail_status` (its `warnings` must be empty), then
   `testrail_get_sections` to find the section, and `testrail_get_cases` with `section_id` and
   `details: true` (once per child section too). Write those cases to `specs/cases/<feature>.csv` first, one
   row each with `testrail_id` filled and `decision` empty, so the review happens in the sheet: the "Why it
@@ -70,9 +73,9 @@ Thens, length, glossary); use its errors and warnings as evidence for `Rewrite`,
 
 Rules for merging:
 
-- Pick the **survivor** in this order: the case already automated, then the one already in TestRail,
-  then the highest priority, then the most complete steps, then the lowest key. The survivor keeps its key
-  and `testrail_id` so TestRail history stays.
+- Pick the **survivor** in this order: the case already automated, then (with TestRail) the one already in
+  TestRail, then the highest priority, then the most complete steps, then the lowest key. The survivor keeps
+  its key (and its `testrail_id`, so TestRail history stays).
 - Keep a **known-bug case separate** from healthy rows (a failing row would mark the whole merged test
   failed or force it to `test.fixme()`). Note that it folds in once the bug is fixed.
 - Don't merge cases that need **different setups** or whose combined journey would let one failure hide
@@ -101,7 +104,7 @@ Write each verdict to the row's `suggestion` column with a short reason (`Merge 
 guard, different trigger`, `Drop: only proves the page loads`). Don't touch `decision`; that's the
 reviewer's. Then summarise for the user (and in `reports/case-review-<feature>-<yyyy-mm-dd>.md`, gitignored):
 
-1. **Before → after**: case count, P1 count, automated count, in TestRail count, and the count against the
+1. **Before → after**: case count, P1 count, automated count, in TestRail count (TestRail only), and the count against the
    tier's budget.
 2. **Resulting cases**: one row each: survivor key and id, title in the owner's words, priority, cases
    merged in, why it matters.
@@ -119,12 +122,12 @@ Ask the user which merges and rewrites to write into the CSV. Default to nothing
    or When/Then pairs in its `scenario`, `data` rows); for each confirmed rewrite, rewrite the row's
    `title` and `scenario` in business words (technical details move to `notes`). Leave the absorbed and dropped rows in
    the file with their suggestion, so the reviewer sees what goes and `push-cases` can retire the ones that
-   are in TestRail. Rows that were never pushed can be deleted once the reviewer agrees.
+   are in TestRail. Rows that were never pushed (every row, with no tracker) can be deleted once the reviewer agrees.
 2. `node .qa/scripts/cases.mjs check <csv>`, then `node .qa/scripts/cases.mjs plan <csv>` to regenerate the
    plan's scenarios. On a repo with a PR workflow, commit on a branch and open a PR.
-3. Tell the user the next step: fill the `decision` column (accept or overrule each suggestion), save, then
-   run `/qa-kit:push-cases <csv>`. Rewritten cases go back to AI draft in TestRail, so only those need
-   approving again.
+3. Tell the user the next step: fill the `decision` column (accept or overrule each suggestion) and save.
+   With TestRail, then run `/qa-kit:push-cases <csv>`; rewritten cases go back to AI draft in TestRail, so
+   only those need approving again.
 
 Specs referencing dropped or merged ids are not changed here. List them and suggest
 `/qa-kit:generate-tests` for the survivors once they are approved (Gate 2 then reviews the spec PR).

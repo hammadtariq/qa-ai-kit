@@ -26,6 +26,7 @@ const lineOf = (text, idx) => text.slice(0, idx).split('\n').length;
 
 // A TestRail id (C123, or 123) or a cases-CSV key (PO-07), the same way tr() in fixtures.ts writes them.
 const ID = /^(?:C?\d+|[A-Z][\w]*-\d+)$/i;
+// Keep in step with tr() in the kit's e2e/fixtures.ts, which writes these ids.
 export const normalizeId = (id) => (/^C?\d+$/i.test(id) ? 'C' + id.replace(/^C/i, '') : id.toUpperCase());
 export const isTestRailId = (id) => /^C\d+$/.test(id);
 

@@ -34,20 +34,30 @@ assumed, and only desktop Chrome ran.
   runs the `@smoke` tests (the P1 journeys); everything else stays on desktop Chrome. Discover (area 7) fills
   it; the CI action installs the browsers those devices need (`browsers: auto`).
 - CI: the app-setup action installs Node dependencies where Playwright lives and exports `QA_TEST`, the
-  test command the workflows now run.
+  test command the workflows now run. The TestRail upload runs only when the tracker is `testrail`, even if
+  TestRail secrets are set at the organization level.
+- Review fixes: the standalone `qa/package.json` gets a valid npm name when installing into `.`; the
+  installer no longer rewrites the CI action's own commands; `data.create` fails at once when the response
+  has no id to delete it by (instead of a `DELETE .../undefined` cleanup note); `generate-tests`,
+  `review-cases` and setup's env check skip TestRail steps when the tracker is `none`; setup installs
+  `qa/` after the installer writes it, and says to commit `qa/package-lock.json`.
 
 Upgrading from 0.7.x:
 
 1. `/plugin marketplace update qa-ai-kit`.
 2. Copy from `templates/`: `.qa/scripts/` (all of it), `e2e/roles.ts` and `e2e/fixtures.ts` into your test
-   folder (keep any fixtures you added), and `.github/actions/qa-app-setup/action.yml`.
+   folder (keep any fixtures you added), and `.github/actions/qa-app-setup/action.yml`. Re-run
+   `install-templates.mjs` (as in setup step 4) to refresh the conventions block in `CLAUDE.md`; it skips
+   files you already have.
 3. In `playwright.config.ts`, take from the template: the `qaRoot` import and `root`, the `.env` and
    `reportDir` lines, `cwd: root` in `webServer`, and the `browsers` block with `...extraProjects`.
-4. In both workflows, replace `npx playwright test` in `run:` lines with `$QA_TEST`, and drop
-   `browsers: chromium` from the nightly's app-setup step.
+4. In both workflows, replace `npx playwright test` in `run:` lines with `$QA_TEST`, drop
+   `browsers: chromium` from the nightly's app-setup step, and add the template's first line of the
+   "Upload results to TestRail" step (it skips when the tracker isn't TestRail).
 5. Nothing else changes for a TestRail project: without `tracker`, a set `testrail.projectId` still means
    TestRail. A project without TestRail: set `"tracker": "none"`.
-6. Optional: `browsers` for extra devices; `--with=mailpit` for the email helper.
+6. Set `"kitVersion": "0.8.0"` in `.qa/config.json`.
+7. Optional: `browsers` for extra devices; `--with=mailpit` for the email helper.
 
 ## 0.7.0 (2026-10-27): fewer, stronger cases
 

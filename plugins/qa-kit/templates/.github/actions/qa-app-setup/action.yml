@@ -24,6 +24,7 @@ runs:
       id: detect
       shell: bash
       run: |
+        # The runner's own Node reads the config (setup-node runs later, once the version is known); no config means ".".
         dir=$(node -p "require('./.qa/config.json').playwrightDir || '.'" 2>/dev/null || echo .)
         if [ -f "$dir/pnpm-lock.yaml" ]; then pm=pnpm; lock=pnpm-lock.yaml
         elif [ -f "$dir/yarn.lock" ]; then pm=yarn; lock=yarn.lock

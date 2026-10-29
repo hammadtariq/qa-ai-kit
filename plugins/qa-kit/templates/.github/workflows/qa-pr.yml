@@ -79,6 +79,7 @@ jobs:
           PR_SHA: ${{ github.event.pull_request.head.sha }}
           TESTRAIL_PROJECT_NAME: ${{ vars.TESTRAIL_PROJECT_NAME }}
         run: |
+          [ "$(node .qa/scripts/cases.mjs tracker)" = testrail ] || { echo "The tracker is not TestRail (.qa/config.json); skipping upload."; exit 0; }
           ls reports/*/junit.xml >/dev/null 2>&1 || { echo "No JUnit reports"; exit 0; }
           # trcli refuses to create a run when no test is linked to a case, and fails the step.
           grep -qs 'name="test_id"' reports/*/junit.xml || { echo "No tests are linked to TestRail cases yet (tr('C123')); skipping upload."; exit 0; }

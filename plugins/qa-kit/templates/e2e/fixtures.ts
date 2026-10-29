@@ -9,6 +9,7 @@ import { defaultRole, qaRole } from './roles';
  *   test('shows an error for an expired coupon', { annotation: tr('C1234'), tag: '@smoke' }, async ({ page }) => { ... });
  *   test('shows an error for an expired coupon', { annotation: tr('CO-04') }, async ({ page }) => { ... });
  */
+// Keep in step with normalizeId in .qa/scripts/lib/specs.mjs, which reads these ids back from the specs.
 export function tr(...caseIds: Array<string | number>) {
   const ids = caseIds.map((id) => (/^C?\d+$/i.test(String(id)) ? `C${String(id).replace(/^C/i, '')}` : String(id).toUpperCase()));
   return { type: 'test_id', description: ids.join(',') };
@@ -16,9 +17,9 @@ export function tr(...caseIds: Array<string | number>) {
 
 // Unique per run (CI run id, else this worker's start time); the worker index and a counter do the rest.
 const RUN = process.env.QA_RUN_ID || process.env.GITHUB_RUN_ID || Date.now().toString(36);
-let made = 0;
+let namesMade = 0;
 
-type Created<T> = { as?: string; id?: (created: T) => string | number; remove?: string | ((created: T) => string) | false };
+type CreateOptions<T> = { as?: string; id?: (created: T) => string | number; remove?: string | ((created: T) => string) | false };
 
 type QaFixtures = {
   /**
@@ -53,7 +54,7 @@ type QaFixtures = {
    */
   data: {
     name: (label: string) => string;
-    create: <T = any>(path: string, body: unknown, options?: Created<T>) => Promise<T>;
+    create: <T = any>(path: string, body: unknown, options?: CreateOptions<T>) => Promise<T>;
     cleanup: (undo: () => Promise<unknown>) => void;
   };
   // Add shared fixtures here, for example an API client:
@@ -84,17 +85,22 @@ export const test = base.extend<QaFixtures>({
   data: async ({ apiAs }, use, testInfo) => {
     const undo: Array<{ what: string; run: () => Promise<unknown> }> = [];
     await use({
-      name: (label) => `${label} qa-${RUN}-w${testInfo.workerIndex}-${++made}`,
+      name: (label) => `${label} qa-${RUN}-w${testInfo.workerIndex}-${++namesMade}`,
       create: async (path, body, options = {}) => {
         const api = await apiAs(options.as ?? defaultRole().name);
         const res = await api.post(path, { data: body });
         if (!res.ok()) throw new Error(`data.create: POST ${path} returned ${res.status()}: ${(await res.text()).slice(0, 200)}`);
         const created = await res.json();
         if (options.remove !== false) {
-          const target =
-            typeof options.remove === 'function'
-              ? options.remove(created)
-              : `${options.remove ?? path}/${options.id ? options.id(created) : created.id}`;
+          let target: string;
+          if (typeof options.remove === 'function') target = options.remove(created);
+          else {
+            const id = options.id ? options.id(created) : created?.id;
+            // Without an id the undo step would be DELETE <path>/undefined; say so now, not in a cleanup note.
+            if (id === undefined || id === null)
+              throw new Error(`data.create: POST ${path} returned no id; pass { id: (created) => ... }, a remove function or remove: false`);
+            target = `${options.remove ?? path}/${id}`;
+          }
           undo.push({
             what: `DELETE ${target}`,
             run: async () => {

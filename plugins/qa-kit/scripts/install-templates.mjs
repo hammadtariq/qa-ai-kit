@@ -14,7 +14,8 @@
 // Prints JSON: { created, merged, skipped, detected } so the caller knows what to finish by hand.
 
 import { readdirSync, statSync, mkdirSync, copyFileSync, existsSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
-import { join, relative, dirname } from "node:path";
+import { join, relative, dirname, basename, resolve } from "node:path";
+import { playwrightBin, configArgs } from "./lib/playwright-dir.mjs";
 
 const args = process.argv.slice(2);
 const flag = (name, dflt) => {
@@ -34,7 +35,8 @@ const pwDir = standalone ? "qa" : ".";
 const testDir = flag("test-dir", standalone ? "qa/e2e" : "e2e").replace(/^\.\//, "").replace(/\/+$/, "");
 // The test folder as the Playwright config sees it (relative to the config's folder).
 const configTestDir = relative(pwDir, testDir).split("\\").join("/");
-const PW = standalone ? "qa/node_modules/.bin/playwright" : "npx playwright";
+const PW = playwrightBin(pwDir);
+const PW_TEST = [`${PW} test`, ...configArgs(pwDir)].join(" ");
 const force = new Set(flag("force", "").split(",").filter(Boolean));
 
 // ---------------------------------------------------------------- detect
@@ -81,11 +83,11 @@ const retarget = (text, to = testDir) =>
         .replace(/testDir: "\.\/e2e"/g, `testDir: "./${to}"`)
         .replace(/"testDir": "e2e"/g, `"testDir": "${to}"`)
         .replace(/(^|[\s`'"(])(\.\/)?e2e\//g, `$1$2${to}/`);
-// Standalone: commands in docs and permissions run the qa/ folder's Playwright with its config.
-const commands = (text) =>
+// Standalone: commands in docs, workflows and permissions run the qa/ folder's Playwright with its config.
+const standaloneCommands = (text) =>
   standalone
     ? text
-        .replace(/npx playwright test/g, `${PW} test -c qa`)
+        .replace(/npx playwright test/g, PW_TEST)
         .replace(/npx playwright (show-report|install)/g, `${PW} $1`)
     : text;
 const TEXT = /\.(md|ts|js|mjs|json|ya?ml|sh|example|qa)$/;
@@ -143,7 +145,9 @@ const SPECIAL = new Set(["CLAUDE.qa.md", "gitignore.qa", "prettierignore.qa", ".
 for (const file of walk(src)) {
   const rel = relative(src, file).split("\\").join("/");
   if (SPECIAL.has(rel)) continue;
-  const outRel = rel.startsWith("e2e/") ? `${testDir}/${rel.slice(4)}` : rel === "playwright.config.ts" ? `${pwDir}/${rel}`.replace(/^\.\//, "") : rel;
+  let outRel = rel;
+  if (rel.startsWith("e2e/")) outRel = `${testDir}/${rel.slice(4)}`;
+  else if (rel === "playwright.config.ts" && standalone) outRel = `${pwDir}/${rel}`;
   if (existsSync(join(dest, outRel)) && !force.has(outRel) && !force.has(rel)) {
     skipped.push(outRel);
     continue;
@@ -152,7 +156,9 @@ for (const file of walk(src)) {
     let text = readFileSync(file, "utf8");
     text = rel === "playwright.config.ts" ? retarget(text, configTestDir) : retarget(text);
     if (rel === ".qa/config.json" && standalone) text = text.replace(/"playwrightDir": "\."/, `"playwrightDir": "${pwDir}"`);
-    writeFile(outRel, commands(text), rel.endsWith(".sh") ? 0o755 : undefined);
+    // The CI action works out where Playwright is on its own, so it keeps both of its branches as written.
+    if (!rel.startsWith(".github/actions/")) text = standaloneCommands(text);
+    writeFile(outRel, text, rel.endsWith(".sh") ? 0o755 : undefined);
   }
   else {
     mkdirSync(dirname(join(dest, outRel)), { recursive: true });
@@ -167,21 +173,23 @@ for (const extra of extras) {
   const notes = join(extrasRoot, extra, `CLAUDE.${extra}.md`);
   if (existsSync(notes)) block = block.replace(/\n### What needs a person/, `\n${readFileSync(notes, "utf8").trim()}\n\n### What needs a person`);
 }
-upsertClaudeMd(commands(retarget(block)));
+upsertClaudeMd(standaloneCommands(retarget(block)));
 
 // Standalone: Playwright's own package.json in qa/ (setup installs it there).
 if (standalone) {
   const qaPkg = join(pwDir, "package.json");
   if (existsSync(join(dest, qaPkg))) skipped.push(qaPkg);
   else {
-    const name = `${(pkg.name || dest.split(/[\\/]/).filter(Boolean).pop() || "app").replace(/[^\w.-]/g, "-").toLowerCase()}-qa`;
+    // npm names can't start with a dot or underscore, so strip those (a scoped name loses its scope too).
+    const base = (pkg.name || basename(resolve(dest))).replace(/^@[^/]+\//, "").replace(/[^\w.-]/g, "-").replace(/^[._-]+/, "").toLowerCase();
+    const name = `${base || "app"}-qa`;
     writeFile(qaPkg, JSON.stringify({ name, private: true, scripts: { test: "playwright test" }, devDependencies: { "@playwright/test": "^1.64.1", "@types/node": "^22.0.0" } }, null, 2) + "\n");
     created.push(qaPkg);
   }
 }
 
 // .claude/settings.json
-const settingsSrc = JSON.parse(commands(readFileSync(join(src, ".claude/settings.json"), "utf8")));
+const settingsSrc = JSON.parse(standaloneCommands(readFileSync(join(src, ".claude/settings.json"), "utf8")));
 const settingsTarget = join(dest, ".claude/settings.json");
 if (existsSync(settingsTarget)) {
   const current = readJson(settingsTarget);

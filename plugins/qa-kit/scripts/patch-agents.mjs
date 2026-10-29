@@ -11,6 +11,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { playwrightDirOf, playwrightBin, configArgs } from "./lib/playwright-dir.mjs";
 
 const dir = process.argv[2] || ".";
 const done = [];
@@ -80,13 +81,10 @@ if (existsSync(mcpPath)) {
     if (!guarded) {
       let server = [srv.command, ...args];
       // Standalone: there's no Playwright at the root, so run qa/'s with qa/'s config.
-      let pwDir = ".";
-      try {
-        pwDir = JSON.parse(readFileSync(join(dir, ".qa/config.json"), "utf8")).playwrightDir || ".";
-      } catch {}
+      const pwDir = playwrightDirOf(dir);
       if (pwDir !== "." && server[0] === "npx" && server[1] === "playwright") {
-        server = [`${pwDir}/node_modules/.bin/playwright`, ...server.slice(2)];
-        if (!server.includes("-c") && !server.includes("--config")) server.push("-c", pwDir);
+        server = [playwrightBin(pwDir), ...server.slice(2)];
+        if (!server.includes("-c") && !server.includes("--config")) server.push(...configArgs(pwDir));
       }
       mcp.mcpServers["playwright-test"] = {
         ...srv,

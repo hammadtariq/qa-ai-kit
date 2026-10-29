@@ -1077,7 +1077,10 @@ function main() {
     return;
   }
 
-  if (cmd === "tracker") return console.log(trackerOf());
+  if (cmd === "tracker") {
+    console.log(trackerOf());
+    return;
+  }
 
   if (cmd === "set") {
     const [path, key, ...pairs] = args;

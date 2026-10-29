@@ -8,7 +8,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { loadReports, flatten, stats } from './lib/results.mjs';
-import { loadQaConfig } from './lib/specs.mjs';
+import { loadQaConfig, trackerOf } from './lib/specs.mjs';
 
 const args = process.argv.slice(2);
 const printOnly = args.includes('--print');
@@ -47,7 +47,7 @@ async function gateCounts() {
 async function testrailRunUrl() {
   const title = env.QA_RUN_TITLE;
   const tr = cfg.testrail || {};
-  if (!title || !env.TESTRAIL_URL || !env.TESTRAIL_USER || !env.TESTRAIL_API_KEY || !tr.projectId) return null;
+  if (!title || !env.TESTRAIL_URL || !env.TESTRAIL_USER || !env.TESTRAIL_API_KEY || trackerOf(cfg) !== 'testrail') return null;
   try {
     const auth = Buffer.from(`${env.TESTRAIL_USER}:${env.TESTRAIL_API_KEY}`).toString('base64');
     const res = await fetch(`${env.TESTRAIL_URL.replace(/\/+$/, '')}/index.php?/api/v2/get_runs/${tr.projectId}&limit=20`, { headers: { Authorization: `Basic ${auth}` } });

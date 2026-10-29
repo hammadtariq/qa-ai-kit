@@ -1,16 +1,20 @@
-// The template installer: the normal layout, another test folder, and standalone mode for repos without Node.
+// The template installer: the normal layout, another test folder, and standalone mode for repos without Node;
+// patch-agents pointing the MCP server at qa/ in standalone mode.
 // Run: node --test 'plugins/qa-kit/tests/*.test.mjs'
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, existsSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, basename } from "node:path";
 import { execFileSync } from "node:child_process";
 
 const PLUGIN = resolve(import.meta.dirname, "..");
 const install = (dir, ...flags) =>
   JSON.parse(execFileSync("node", [join(PLUGIN, "scripts", "install-templates.mjs"), PLUGIN, dir, ...flags], { encoding: "utf8" }));
+// Install into "." from inside the repo, the way setup runs it.
+const installHere = (dir, ...flags) =>
+  JSON.parse(execFileSync("node", [join(PLUGIN, "scripts", "install-templates.mjs"), PLUGIN, ".", ...flags], { cwd: dir, encoding: "utf8" }));
 const read = (dir, f) => readFileSync(join(dir, f), "utf8");
 
 test("default install: config at the root, tests in e2e/", () => {
@@ -54,4 +58,43 @@ test("standalone: Playwright in qa/, .qa/ at the root, commands run qa/'s Playwr
   assert.ok(JSON.parse(read(dir, ".claude/settings.json")).permissions.allow.includes("Bash(qa/node_modules/.bin/playwright test -c qa:*)"));
   assert.match(read(dir, ".github/workflows/qa-pr.yml"), /Bash\(qa\/node_modules\/\.bin\/playwright test -c qa:\*\)/);
   assert.match(read(dir, ".gitignore"), /^qa\/node_modules\/$/m);
+});
+
+test("standalone into \".\": the qa package is named after the folder, and the CI action keeps both branches", () => {
+  const dir = mkdtempSync(join(tmpdir(), "qa-kit-install-"));
+  installHere(dir, "--standalone");
+  const name = JSON.parse(read(dir, "qa/package.json")).name;
+  assert.equal(name, `${basename(dir).toLowerCase()}-qa`);
+  assert.match(name, /^[a-z0-9]/);
+  const action = read(dir, ".github/actions/qa-app-setup/action.yml");
+  assert.match(action, /qa_test="npx playwright test"/);
+  assert.match(action, /qa_test="\$dir\/node_modules\/\.bin\/playwright test -c \$dir"/);
+});
+
+test("standalone with a scoped or dotted package name: a valid npm name", () => {
+  const dir = mkdtempSync(join(tmpdir(), "qa-kit-install-"));
+  writeFileSync(join(dir, "package.json"), '{"name":"@acme/.Shop App"}');
+  install(dir, "--standalone");
+  assert.equal(JSON.parse(read(dir, "qa/package.json")).name, "shop-app-qa");
+});
+
+test("the TestRail upload steps check the tracker first", () => {
+  for (const wf of ["qa-pr.yml", "qa-nightly.yml"]) {
+    const text = readFileSync(join(PLUGIN, "templates", ".github", "workflows", wf), "utf8");
+    const step = text.slice(text.indexOf("- name: Upload results to TestRail"));
+    const firstRun = step.slice(step.indexOf("run: |")).split("\n")[1];
+    assert.match(firstRun, /cases\.mjs tracker\)" = testrail \] \|\| \{.*exit 0; \}/, wf);
+  }
+});
+
+test("patch-agents in standalone: the guarded MCP server runs qa/'s Playwright with -c qa", () => {
+  const dir = mkdtempSync(join(tmpdir(), "qa-kit-agents-"));
+  mkdirSync(join(dir, ".qa", "scripts"), { recursive: true });
+  writeFileSync(join(dir, ".qa", "config.json"), '{"playwrightDir":"qa"}');
+  writeFileSync(join(dir, ".qa", "scripts", "mcp-guard.mjs"), "");
+  writeFileSync(join(dir, ".mcp.json"), JSON.stringify({ mcpServers: { "playwright-test": { command: "npx", args: ["playwright", "run-test-mcp-server"] } } }));
+  execFileSync("node", [join(PLUGIN, "scripts", "patch-agents.mjs"), dir], { encoding: "utf8" });
+  const srv = JSON.parse(read(dir, ".mcp.json")).mcpServers["playwright-test"];
+  assert.equal(srv.command, "node");
+  assert.deepEqual(srv.args, [".qa/scripts/mcp-guard.mjs", "--", "qa/node_modules/.bin/playwright", "run-test-mcp-server", "-c", "qa"]);
 });

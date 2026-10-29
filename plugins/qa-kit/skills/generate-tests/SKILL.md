@@ -13,7 +13,8 @@ Input: `$ARGUMENTS`
 `CLAUDE.md` first, including any helpers under `<testDir>/support/` (UI-library widgets, the `mailbox`).
 `<test command>` is the one in `CLAUDE.md` → Commands: `npx playwright test`, or
 `qa/node_modules/.bin/playwright test -c qa` in standalone mode. Run
-`node .qa/scripts/cases.mjs tracker`: `testrail` or `none` (the CSV is the only record of the cases).
+`node .qa/scripts/cases.mjs tracker`: `testrail` or `none`. **With `none`, skip every TestRail step below**: the
+cases CSV is the only record of the cases and `tr()` carries the row's key.
 
 ## 1. Pick the cases
 
@@ -64,11 +65,11 @@ which match `CLAUDE.md`:
 - `notes` holds the technical hints (test ids, routes, what to stub); it's guidance, not part of the case.
 - **`level` = `api` cases** are Playwright tests with no page: use the `request` fixture (or `apiAs(role)`)
   to set up, act and assert on the responses and the stored result, in the same spec file, with the same
-  `tr()` annotation so the result reaches TestRail. Put them in a `test.describe('API', ...)` block.
+  `tr()` annotation so the result is linked to its case. Put them in a `test.describe('API', ...)` block.
 - **Roles:** a case about another role uses `asRole('<role>')` (a page signed in as that role) or
   `apiAs('<role>')` (a request context with that role's session) from the fixtures; role names come from
   `roles` in `.qa/config.json`. The default `page` is the default role.
-- **One TestRail case = one test**, so each case gets one result. Keep the case's shape
+- **One case = one test**, so each case gets one result. Keep the case's shape
   (playbook: `${CLAUDE_PLUGIN_ROOT}/skills/plan-feature/test-design.md`):
   - journey case (several When/Then pairs) → one test with a `test.step()` per pair, each ending in its
     own assertion, so a failure names the checkpoint;
