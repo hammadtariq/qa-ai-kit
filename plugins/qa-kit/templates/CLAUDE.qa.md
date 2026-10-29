@@ -48,6 +48,8 @@ review at five gates. Follow these rules in every session.
   the TestRail id, or `tr('PO-07')` with the CSV row's key when there is no tracker. Results reach TestRail
   only through this annotation. Don't put the case id in the title.
 - P1 cases get `tag: '@smoke'`. Flaky tests under investigation get `'@quarantine'` (skipped in CI).
+- With `areas` in `.qa/config.json`, every test also gets `@area-<name>` for its feature's area; a PR runs
+  `@smoke`, the tests it changed and the areas whose paths it changed (`node .qa/scripts/areas.mjs`).
 - Locators, in order of preference: `getByRole`, `getByLabel`, `getByText`, `getByTestId`. No XPath, no long CSS chains.
 - Assert the business outcome (record created, total correct, error shown), not only that a page loaded.
   Use `toMatchAriaSnapshot` for regions whose structure matters.

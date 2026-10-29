@@ -1,0 +1,7 @@
+{
+  "name": "kolachi-supplies",
+  "private": true,
+  "description": "Wholesale ordering for corner shops: staff take orders by phone, managers handle refunds.",
+  "scripts": { "start": "node server.mjs" },
+  "engines": { "node": ">=22" }
+}

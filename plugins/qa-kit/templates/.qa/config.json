@@ -1,6 +1,6 @@
 {
   "name": "CLIENT_PROJECT_NAME",
-  "kitVersion": "0.8.0",
+  "kitVersion": "0.9.0",
   "testDir": "e2e",
   "playwrightDir": ".",
   "app": {
@@ -11,6 +11,8 @@
   },
   "tracker": null,
   "browsers": null,
+  "a11y": null,
+  "areas": null,
   "roles": null,
   "defaultRole": null,
   "cases": {

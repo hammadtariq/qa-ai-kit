@@ -50,7 +50,9 @@ which match `CLAUDE.md`:
 - Every test carries its case: `test('shows an error for an expired coupon', { annotation: tr('C1234') }, async ({ page }) => { ... })`,
   with the TestRail id, or with no tracker the row's key (`tr('CO-04')`). This annotation is how results
   reach TestRail and how upkeep matches tests to cases. Don't put the id in the title.
-- P1 cases also get `tag: '@smoke'`.
+- P1 cases also get `tag: '@smoke'`. When `.qa/config.json` → `areas` is set, every test also gets its
+  area's tag, `@area-<name>` (`tag: ['@smoke', '@area-purchases']`), so a PR that changes the area's code
+  runs it. The name is the feature's area in `areas`; add the area there first if it's missing.
 - Locators: `getByRole`, `getByLabel`, `getByText`, then `getByTestId`. No CSS chains or XPath.
   Use the helpers in `<testDir>/support/` for component-library widgets (for example `antSelect` for
   Ant Design selects) instead of raw clicks on dropdown options.
@@ -100,6 +102,12 @@ which match `CLAUDE.md`:
 - **Dates and time with `page.clock`**: `await page.clock.setFixedTime(new Date('2026-01-31T23:59:00'))`
   (or `page.clock.install` plus `fastForward` for expiry and timers) before the page loads, instead of
   waiting or editing data. Time zones and formats through `test.use({ timezoneId, locale })`.
+
+- **Accessibility** (`.qa/config.json` → `a11y` is `true`): for each page this feature adds to a key
+  journey, add one test to `<testDir>/a11y/key-pages.spec.ts`: `tag: '@a11y'`, no case id, open the page in
+  the state a user sees it (signed in, data loaded, assert something visible first), then
+  `await expectAccessible(page)` from `<testDir>/support/a11y.ts` (installed with `--with=a11y`). Skip pages
+  already in the file. It fails only on serious and critical issues; never weaken it to pass.
 
 ## 3. Verify
 

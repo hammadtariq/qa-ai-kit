@@ -93,6 +93,13 @@ them. `plan-feature` will not use `(assumed)` facts to justify a P1.
   `{ "devices": ["Desktop Safari", "iPhone 13"], "locales": ["ar-SA"] }` (Safari on iPhone → `"iPhone 13"`,
   Chrome on Android → `"Pixel 7"`, Safari on desktop → `"Desktop Safari"`, Firefox → `"Desktop Firefox"`,
   Edge → `"Desktop Edge"`). These run the P1 journeys (`@smoke`); everything runs on desktop Chrome.
+- **Accessibility (area 7):** "required" or "we'd like to" → `"a11y": true` in `.qa/config.json`. If the
+  project has no `<testDir>/support/a11y.ts`, tell the user to re-run the installer with `--with=a11y`.
+  Each page of a key journey then gets an axe check (`@a11y`) when its feature's tests are written.
+- **Areas (Areas and risk tiers):** for each area in the table, set `.qa/config.json` → `areas` with the
+  source folders that belong to it, read from the code (`"purchases": ["src/purchases/**",
+  "app/api/purchases/**"]`, names in lower case with dashes). Leave out shared code (layouts, auth, utils);
+  `@smoke` covers it. PRs then run the tests of the areas they change.
 - **Email or SMS through a test inbox (area 6):** if the project has no `<testDir>/support/mailbox.ts`, tell
   the user to re-run the installer with `--with=mailpit` (see `/qa-kit:setup-project` step 4).
 - **Cleanup (area 10):** "create only" or "separate test organization" means tests can't delete what they

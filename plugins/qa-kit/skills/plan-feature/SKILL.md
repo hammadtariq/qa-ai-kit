@@ -22,7 +22,9 @@ owner isn't available, carry on with what's there, but no `(assumed)` fact can j
 P2 until the owner confirms the rule, and the hand-over lists them.
 
 Note the feature's area and its risk tier (low / medium / high) from "Areas and risk tiers"; it goes in the
-brief and decides how many cases the feature gets.
+brief and decides how many cases the feature gets. If `.qa/config.json` → `areas` is set and has no entry
+for this area, add one with the area's source folders (globs from the repo root, e.g.
+`"purchases": ["src/purchases/**", "app/api/purchases/**"]`), so PRs that change them run its tests.
 
 ## 1. Required business behaviour
 

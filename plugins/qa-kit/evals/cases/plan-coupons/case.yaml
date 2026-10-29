@@ -1,0 +1,72 @@
+schema_version: "1.1"
+name: plan-coupons
+description: plan-feature turns the coupons brief into a short, readable cases CSV that covers the owner's risks.
+runs: 1
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: "/qa-kit:plan-feature specs/briefs/coupons.md (feature slug: coupons)"
+  max_turns: 150
+  timeout_seconds: 2400
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Bash, Skill, Task]
+  append_system_prompt: >-
+    This is an unattended evaluation run. No person is present: never call AskUserQuestion and don't wait
+    for replies; the brief's Decisions table holds the owner's answers. No browser and no running app are
+    available: where the skill would explore the app with the planner agent, read the code, the brief and
+    the business context instead, and write the plan from them. Use the feature slug given in the prompt.
+    Don't commit, push or open pull requests; leave the files in the working tree.
+graders:
+  - name: cases-file
+    type: regex
+    target: {source: file, path: specs/cases/coupons.csv}
+    pattern: "scenario"
+  - name: check-ran
+    type: tool_used
+    tool: Bash
+    input_match: "cases\\.mjs check"
+  - name: check-clean
+    type: regex
+    target: trace
+    pattern: "(^|[^0-9])0 error\\(s\\)"
+  - name: within-budget
+    type: llm
+    focus: {source: file, path: specs/cases/coupons.csv}
+    criteria: >-
+      Count the live rows: rows whose suggestion and decision are not Drop or Merge, and whose level is ui,
+      api or empty (unit rows don't count). Pass if there are at most 12 (the medium tier's
+      budget) and at least 3.
+  - name: owner-risks-covered
+    type: llm
+    focus: {source: file, path: specs/cases/coupons.csv}
+    criteria: >-
+      The risks column links each of the owner's risks this feature touches, 5 (a coupon works through its whole last day in Karachi time, and once per shop), to at least one
+      live row whose scenario actually proves that rule. Pass only if every one is covered.
+  - name: known-bugs-found
+    type: llm
+    focus: {source: file, path: specs/cases/coupons.csv}
+    criteria: >-
+      The sample app has two bugs in this feature: (a) a coupon is refused on its last day (the expiry is compared at midnight UTC, not the end of the day in Karachi); (b) a shop can use the same coupon again. Each has its own row whose scenario expects the
+      correct behaviour from the brief (not the buggy behaviour), with known_issue or review_notes saying the
+      code looks wrong. Pass if both bugs are covered this way.
+  - name: no-duplicates
+    type: llm
+    focus: {source: file, path: specs/cases/coupons.csv}
+    criteria: >-
+      Look only at live rows (suggestion and decision are not Drop or Merge) and their title and scenario.
+      FAIL if two live rows would catch exactly the same bug, or if one check is split into several rows that
+      differ only by an input value or a role instead of one row with a data table. These are NOT duplicates
+      and are intended: an api row that checks a rule with a data table plus one ui row showing the person
+      the message for it; a journey row and a separate row for a known bug; rows for different roles' rules.
+      Otherwise PASS.
+  - name: readable-by-owner
+    type: llm
+    focus: {source: file, path: specs/cases/coupons.csv}
+    criteria: >-
+      Judge only the title and scenario columns of live rows (suggestion and decision are not Drop or Merge).
+      Ignore every other column (notes, known_issue, data, source, review_notes, why_it_matters): they are
+      for the team and may be technical. Placeholders like <amount> filled from the data column are fine.
+      FAIL if any scenario uses one of these words: click, button, field, selector, endpoint, status code,
+      database, xpath, css, JSON, or a URL or code path; or if a scenario isn't Given/When/Then; or if a Then
+      has no value a person could see (an amount, a message, a count, who can or can't do something).
+      Otherwise PASS. Business words such as shop, order, refund, stock, Rs, message and "a direct request"
+      are fine.

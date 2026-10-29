@@ -7,6 +7,7 @@
 
 import { readFileSync } from 'node:fs';
 import { findSpecFiles, parseSpec, loadQaConfig, trackerOf, isTestRailId } from './lib/specs.mjs';
+import { areasOf } from './lib/areas.mjs';
 
 const args = process.argv.slice(2);
 const json = args.includes('--json');
@@ -15,6 +16,13 @@ const tracker = trackerOf(cfg);
 const targets = args.filter((a) => !a.startsWith('--'));
 const files = findSpecFiles(targets.length ? targets : [cfg.testDir || 'tests']);
 const SEED = /(^|\/)seed\.spec\.[jt]s$/;
+let areas = [];
+try {
+  areas = Object.keys(areasOf(cfg));
+} catch (e) {
+  console.error(e.message);
+  process.exit(1);
+}
 
 const findings = [];
 const add = (level, file, line, rule, message) => findings.push({ level, file, line, rule, message });
@@ -38,7 +46,8 @@ for (const file of files) {
   }
   if (SEED.test(file)) continue;
   for (const t of parseSpec(file)) {
-    if (t.caseIds.length === 0) {
+    // Accessibility checks (@a11y) cover pages, not cases, so they carry no id.
+    if (t.caseIds.length === 0 && !t.tags.includes('@a11y')) {
       add('error', file, t.line, 'test-id', tracker === 'testrail'
         ? `"${t.title}" has no TestRail id. Add { annotation: tr('C123') } so its result reaches TestRail`
         : `"${t.title}" has no case key. Add { annotation: tr('PO-07') } with its row's key in specs/cases/`);
@@ -46,6 +55,15 @@ for (const file of files) {
     if (tracker === 'testrail') {
       for (const id of t.caseIds.filter((x) => !isTestRailId(x))) {
         add('warn', file, t.line, 'test-id', `"${t.title}" links to ${id}, a CSV key; push the case (/qa-kit:push-cases) and use its TestRail id so the result reaches TestRail`);
+      }
+    }
+    if (areas.length && !t.tags.includes('@a11y')) {
+      const tagged = t.tags.filter((x) => x.startsWith('@area-')).map((x) => x.slice(6));
+      for (const name of tagged.filter((x) => !areas.includes(x))) {
+        add('warn', file, t.line, 'area', `"${t.title}" is tagged @area-${name}, which isn't in "areas" in .qa/config.json`);
+      }
+      if (!tagged.length && !t.tags.includes('@smoke')) {
+        add('warn', file, t.line, 'area', `"${t.title}" has no @area-<name> tag, so PRs run it only when they change its file (areas: ${areas.join(', ')})`);
       }
     }
     if (!t.hasAssertion && !t.fixme && t.modifier !== 'skip') {

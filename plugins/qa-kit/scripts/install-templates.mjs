@@ -8,6 +8,8 @@
 // - .claude/settings.json is deep-merged into an existing one (arrays de-duplicated, existing keys kept).
 // - gitignore.qa / prettierignore.qa append only the missing lines.
 // - --with=antd (auto-detected from package.json) adds <test-dir>/support/antd.ts and its CLAUDE.md notes.
+//   --with=mailpit (email inbox) and --with=a11y (axe checks) work the same way; packages an extra needs are listed
+//   under detected.install (and go into qa/package.json in standalone mode).
 // - --standalone (repos without Node): Playwright gets its own qa/ folder with a package.json, the config goes
 //   to qa/playwright.config.ts, tests to qa/e2e, and .qa/ stays at the root. Commands run from the root as
 //   "qa/node_modules/.bin/playwright test -c qa"; the config finds .env, sessions and reports from the root.
@@ -62,6 +64,10 @@ const detected = {
   standalone,
 };
 const extras = new Set(flag("with", detected.antd ? "antd" : "").split(",").filter(Boolean));
+// npm packages an extra needs, installed next to @playwright/test.
+const EXTRA_PACKAGES = { a11y: { "@axe-core/playwright": "^4.14.0" } };
+const extraPackages = Object.assign({}, ...[...extras].map((e) => EXTRA_PACKAGES[e] || {}));
+detected.install = Object.entries(extraPackages).filter(([p]) => !deps[p]).map(([p, v]) => `${p}@${v}`);
 
 // ---------------------------------------------------------------- helpers
 
@@ -183,7 +189,7 @@ if (standalone) {
     // npm names can't start with a dot or underscore, so strip those (a scoped name loses its scope too).
     const base = (pkg.name || basename(resolve(dest))).replace(/^@[^/]+\//, "").replace(/[^\w.-]/g, "-").replace(/^[._-]+/, "").toLowerCase();
     const name = `${base || "app"}-qa`;
-    writeFile(qaPkg, JSON.stringify({ name, private: true, scripts: { test: "playwright test" }, devDependencies: { "@playwright/test": "^1.64.1", "@types/node": "^22.0.0" } }, null, 2) + "\n");
+    writeFile(qaPkg, JSON.stringify({ name, private: true, scripts: { test: "playwright test" }, devDependencies: { "@playwright/test": "^1.64.1", "@types/node": "^22.0.0", ...extraPackages } }, null, 2) + "\n");
     created.push(qaPkg);
   }
 }

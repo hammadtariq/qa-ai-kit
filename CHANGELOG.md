@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.9.0 (2026-10-29): extras and checking the kit itself
+
+Phase 4 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, accessibility wasn't checked, every PR
+ran the same `@smoke` set whatever it changed, and prompt changes to the skills shipped untested.
+
+- **Accessibility (opt-in)**: `--with=a11y` adds `<testDir>/support/a11y.ts`, `expectAccessible(page)` on
+  `@axe-core/playwright` (WCAG 2.1 A and AA rules). It fails only on serious and critical issues; minor and
+  moderate ones go in an `a11y` annotation, and the full axe result is attached to the report. With
+  `"a11y": true` in `.qa/config.json`, `generate-tests` adds one `@a11y` test per key-journey page to
+  `<testDir>/a11y/key-pages.spec.ts`. Discover asks about accessibility (area 7) and turns it on. `@a11y`
+  tests need no case id. The installer lists the package to install (`detected.install`), and in standalone
+  mode puts it in `qa/package.json`.
+- **Run only what a PR touches**: `.qa/config.json` → `areas`, e.g.
+  `{ "purchases": ["src/purchases/**", "app/api/purchases/**"] }`. Discover fills it from the code, and
+  plan-feature adds a missing area. `generate-tests` tags tests `@area-<name>`, and `lint-specs` warns on an
+  unknown area tag or a test with none. `node .qa/scripts/areas.mjs --base origin/main` prints the `--grep` for
+  `@smoke` plus the touched areas, and the PR workflow's smoke step uses it. Without `areas` it is `@smoke`,
+  as before; the nightly still runs everything.
+- **Evals for the skills** (`plugins/qa-kit/evals/`, run with `claude plugin eval`): a sample wholesale app
+  with six known bugs, the owner's answers, and three briefs. `discover` and `plan-feature` run unattended,
+  and graders check the business context, `cases.mjs check`, budget, risk coverage, known bugs, duplicates
+  and readability. In this repo, `.github/workflows/kit-evals.yml` runs them on PRs that touch `skills/`,
+  `templates/.qa/scripts/` or `evals/`, and `kit-tests.yml` runs the script tests on every plugin change.
+
+Upgrading from 0.8.x:
+
+1. `/plugin marketplace update qa-ai-kit`.
+2. Copy `.qa/scripts/` from `templates/` (new: `areas.mjs`, `lib/areas.mjs`; changed: `lint-specs.mjs`).
+3. In `qa-pr.yml`, replace the "Smoke tests" step with the template's "Smoke tests and the areas this PR
+   touches".
+4. Set `"kitVersion": "0.9.0"` in `.qa/config.json`. Optional: `areas`, and `"a11y": true` with
+   `--with=a11y` and `npm i -D @axe-core/playwright@^4.14.0`.
+5. Re-run `install-templates.mjs` to refresh the conventions block in `CLAUDE.md`.
+
 ## 0.8.0 (2026-10-28): works on any project
 
 Phase 3 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, tests shared seed data, the kit had

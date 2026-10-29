@@ -110,9 +110,13 @@ services with no sandbox are stubbed, and the case's notes say what the stub hid
 - "Which browsers and devices must it work on?" (multiSelect) Options: "Chrome on desktop", "Safari on
   iPhone", "Chrome on Android", "Edge / Firefox on desktop".
 - Only if the code shows more than one: "Which languages, currencies or time zones are in use?"
+- "Do you need to meet accessibility rules (WCAG, a public-sector or enterprise contract, users with screen
+  readers)?" Options: "Yes, it's required", "We'd like to, it isn't required", "No". Draft the answer from
+  the code (alt texts, ARIA, an accessibility statement page) and contracts in the repo.
 
-**Answered when:** browsers and devices, and languages, currencies and time zones when relevant. Anything
-beyond desktop Chrome becomes `browsers` in `.qa/config.json` (the P1 journeys run on each).
+**Answered when:** browsers and devices, languages, currencies and time zones when relevant, and whether
+accessibility matters. Anything beyond desktop Chrome becomes `browsers` in `.qa/config.json` (the P1
+journeys run on each); "required" or "we'd like to" turns on `a11y`.
 
 ## 8. What tests already cover [Existing test coverage]
 

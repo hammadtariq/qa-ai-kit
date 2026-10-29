@@ -139,14 +139,15 @@ CSVs from before 0.6.0 (numbered steps and expected results) keep working; `case
 - `e2e/`: `fixtures.ts` (the `tr('C123')` case helper, `asRole` / `apiAs` for acting as another role, and
   `data` for test data that deletes itself after each test), `auth.setup.ts` and `roles.ts` (one saved login
   per role), `seed.spec.ts`, plus Ant Design helpers if the app uses antd and a Mailpit `mailbox` helper for
-  reading the app's emails (`--with=mailpit`).
+  reading the app's emails (`--with=mailpit`) and axe accessibility checks for key pages (`--with=a11y`).
 - In standalone mode the same files sit in `qa/` (`qa/playwright.config.ts`, `qa/e2e/`), with their own
   `package.json`; `.qa/` stays at the root.
 - QA rules appended to `CLAUDE.md`; the plugin and permissions merged into `.claude/settings.json`.
 - `.qa/`: `config.json`, `business-context.md`, `glossary.md`, `app-setup.sh` (CI app prep: database, seed, build) and
   helper scripts (cases CSV, lint, failure extraction, flaky history, Slack digest, a browser watchdog).
 - Two GitHub workflows:
-  - **qa-pr.yml**: lints specs, runs changed and `@smoke` tests, uploads to TestRail; on failure Claude
+  - **qa-pr.yml**: lints specs, runs changed and `@smoke` tests and the tests of the areas the PR touches
+    (`areas` in `.qa/config.json`), uploads to TestRail; on failure Claude
     comments on the PR.
   - **qa-nightly.yml**: full regression at 01:00 PKT, TestRail upload, Claude triage (fix PRs, bug drafts,
     escalations, quarantine), then the Slack digest.

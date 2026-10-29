@@ -58,11 +58,14 @@ agree a local or staging database with the user first.
 ## 4. Templates
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/install-templates.mjs" "${CLAUDE_PLUGIN_ROOT}" . --test-dir=<folder from step 2> [--standalone] [--with=mailpit]
+node "${CLAUDE_PLUGIN_ROOT}/scripts/install-templates.mjs" "${CLAUDE_PLUGIN_ROOT}" . --test-dir=<folder from step 2> [--standalone] [--with=mailpit,a11y]
 ```
 
 `--standalone` for repos without Node (step 1). `--with=mailpit` when the app sends email or SMS and tests
 should read it: it adds `<folder>/support/mailbox.ts`, which reads a Mailpit test inbox (`MAILPIT_URL`).
+`--with=a11y` when `a11y` is on (discover, or the user asks): it adds `<folder>/support/a11y.ts`, axe checks
+for key pages. Install what `detected.install` lists with the repo's package manager
+(`npm i -D @axe-core/playwright@^4.14.0`); in standalone mode it is already in `qa/package.json`.
 
 It prints JSON with `created`, `merged`, `skipped` and `detected` (package manager, Node, antd, unit runner):
 

@@ -98,3 +98,15 @@ test("patch-agents in standalone: the guarded MCP server runs qa/'s Playwright w
   assert.equal(srv.command, "node");
   assert.deepEqual(srv.args, [".qa/scripts/mcp-guard.mjs", "--", "qa/node_modules/.bin/playwright", "run-test-mcp-server", "-c", "qa"]);
 });
+
+test("--with=a11y: the axe helper, its notes, and the package to install (in qa/package.json when standalone)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "qa-kit-install-"));
+  const out = install(dir, "--with=a11y");
+  assert.deepEqual(out.detected.install, ["@axe-core/playwright@^4.14.0"]);
+  assert.ok(existsSync(join(dir, "e2e", "support", "a11y.ts")));
+  assert.match(read(dir, "CLAUDE.md"), /### Accessibility \(axe\)[\s\S]*e2e\/support\/a11y\.ts/);
+  const qa = mkdtempSync(join(tmpdir(), "qa-kit-install-"));
+  install(qa, "--standalone", "--with=a11y");
+  assert.equal(JSON.parse(read(qa, "qa/package.json")).devDependencies["@axe-core/playwright"], "^4.14.0");
+  assert.match(read(qa, "CLAUDE.md"), /qa\/e2e\/a11y\/key-pages\.spec\.ts/);
+});

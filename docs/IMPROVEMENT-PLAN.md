@@ -1,7 +1,6 @@
 # QA Kit improvement plan
 
-Status: **Phases 1-3 built (0.6.0, 0.7.0, 0.8.0)**, with the recommended answer for every decision below. Phase 4
-is still a draft: mark up anything you want changed before work starts.
+Status: **All four phases built (0.6.0 to 0.9.0)**, with the recommended answer for every decision below.
 
 ## Why
 
@@ -348,6 +347,14 @@ Prompt changes today ship untested. Add `evals/`:
 ### Done when
 
 - The eval suite runs in CI on PRs that touch `skills/` or `templates/.qa/scripts/`.
+
+As built (0.9.0), with small changes from the draft above: accessibility is an install extra (`--with=a11y`,
+`expectAccessible(page)`) plus `"a11y": true`, and its tests live in one `<testDir>/a11y/key-pages.spec.ts`
+with no case id. Areas are plain path globs matched by `.qa/scripts/areas.mjs` (no glob dependency); files
+in no area add nothing beyond `@smoke`, and `lint-specs` warns on a test without an area tag. `claude plugin
+eval` has no script graders, so "`cases.mjs check` has no errors" is a regex on the run's trace, and budget,
+risk coverage and duplicates are judged on the CSV; the sample app has two known bugs per ticket. The eval
+runs are unattended and have no browser, so `plan-feature` plans from the code, not the planner agent.
 
 ## Risks
 
