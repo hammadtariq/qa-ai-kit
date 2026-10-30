@@ -17,7 +17,7 @@ Nothing is used in production. Tests run against a staging site or a copy of you
 
 | You need | Why | If you don't have it |
 | --- | --- | --- |
-| [Claude Code](https://claude.com/claude-code) on your computer, signed in | You give Claude the commands here | Install it, then run `claude` once to sign in |
+| Claude Code, signed in with a Claude Pro, Max, Team or Enterprise plan (the free plan doesn't include it) | You give Claude the commands here | [Install it](#before-you-start-install-claude-code) below |
 | Your app's code on GitHub, opened on your computer | Claude reads the code and adds the tests to it | Ask your developer for the repo link and clone it |
 | [Node.js](https://nodejs.org) 22 | The tests run on it, whatever your app is built with | Install the LTS version |
 | [GitHub CLI](https://cli.github.com), signed in (`gh auth login`) | Claude opens pull requests for you to review | Install it and sign in once |
@@ -26,9 +26,55 @@ Nothing is used in production. Tests run against a staging site or a copy of you
 
 You don't need TestRail. If your team uses it, see [TestRail (optional)](#testrail-optional).
 
+The kit runs in **Claude Code only**. It doesn't work in Codex, Cursor or other AI coding tools: it relies on
+Claude Code's plugins, slash commands and safety hooks.
+
+## Before you start: install Claude Code
+
+Open a terminal (on a Mac: the Terminal app; on Windows: PowerShell) and paste the line for your computer.
+
+Mac or Linux:
+
+```
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+Windows (PowerShell):
+
+```
+irm https://claude.ai/install.ps1 | iex
+```
+
+Or, on a Mac with Homebrew: `brew install --cask claude-code`.
+
+The installer shows nothing while it downloads; wait for the prompt to come back. Then open a **new**
+terminal window and check it worked:
+
+```
+claude --version
+```
+
+It prints a version number. If it says `claude` isn't found, follow
+[Troubleshoot installation](https://code.claude.com/docs/en/troubleshoot-install.md).
+
+**Sign in.** Go to your app's folder and start Claude Code:
+
+```
+cd path/to/your-app
+claude
+```
+
+The first time, a browser window opens: sign in with your Claude account and come back to the terminal.
+From now on, typing `claude` in your app's folder is how you start; every command in this guide is typed
+there.
+
+On Windows, installing [Git for Windows](https://git-scm.com/downloads/win) is recommended. The kit has been
+used on macOS and Linux; on Windows, [WSL](https://learn.microsoft.com/windows/wsl/install) is the safer
+choice. More options: [Claude Code setup](https://code.claude.com/docs/en/setup.md).
+
 ## Step 1. Install the kit (once)
 
-Open Claude Code and type:
+Inside Claude Code, type:
 
 ```
 /plugin install qa-kit --marketplace hammadtariq/qa-ai-kit

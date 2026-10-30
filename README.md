@@ -5,8 +5,8 @@ business, writes short test cases in plain English, turns them into automated br
 failures. You approve the work at five checkpoints, in a spreadsheet and on GitHub. It works on any web app,
 whatever it's built with, with or without TestRail.
 
-**New here? Follow [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).** It takes about an hour and needs no
-coding.
+**New here? Follow [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).** It takes about an hour, needs no
+coding, and starts with installing Claude Code. The kit runs in Claude Code only (not Codex or Cursor).
 
 ## Quick start
 
