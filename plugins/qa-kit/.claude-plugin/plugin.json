@@ -2,7 +2,7 @@
   "name": "qa-kit",
   "displayName": "QA Kit",
   "version": "0.9.0",
-  "description": "Claude-driven QA pipeline: Playwright test agents for planning, generating and healing tests, TestRail as the system of record, and guard hooks that keep humans in charge of assertions and bug reports.",
+  "description": "Tests your web app the way its owner would: an owner interview, plain-English test cases, Playwright tests and CI triage, with a person approving at five gates. Works on any web app, with or without TestRail.",
   "author": {
     "name": "Hammad Tariq"
   },
