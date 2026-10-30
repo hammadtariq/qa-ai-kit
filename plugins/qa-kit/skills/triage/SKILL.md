@@ -45,7 +45,8 @@ When unsure between drift and bug, choose **Unclear**. A wrong "drift" call hide
   tests only, one group at a time.
 - The healer may change locators, waits and navigation only. In CI a hook denies any change to an
   assertion matcher or expected value; if that happens, move the test to Unclear and do not retry the edit.
-- Confirm: `npx playwright test <files> --repeat-each=3` passes.
+- Confirm: `<test command> <files> --repeat-each=3` passes (`npx playwright test`, or the standalone
+  command in `CLAUDE.md` → Commands).
 - Open one PR: `gh pr create --label qa:heal` listing each test, what changed and why, with before/after locators.
 - In `pr` mode, don't push to the developer's branch: post the suggested change as a PR comment instead.
 

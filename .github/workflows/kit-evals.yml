@@ -1,0 +1,74 @@
+# The kit's eval suite (plugins/qa-kit/evals): discover and plan-feature run unattended on a sample app with
+# known bugs, and graders check the business context and the cases CSVs. Runs on PRs that change the skills,
+# the .qa scripts or the evals. Costs model calls: each run is capped by --max-cost-usd. The score threshold
+# (0.8) absorbs noisy judges; hard-graders.mjs then fails the job on any failed deterministic grader.
+name: Kit - skill evals
+
+on:
+  pull_request:
+    paths:
+      - "plugins/qa-kit/skills/**"
+      - "plugins/qa-kit/templates/.qa/scripts/**"
+      - "plugins/qa-kit/evals/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kit-evals-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_VERSION: 2.1.312
+      EVAL_MODEL: claude-sonnet-5-5
+      JUDGE_MODEL: claude-haiku-5-5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check the API key
+        run: '[ -n "$ANTHROPIC_API_KEY" ] || { echo "::error::Set the ANTHROPIC_API_KEY secret to run the evals"; exit 1; }'
+
+      - name: Install Claude Code and the Bash sandbox
+        run: |
+          npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+          sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap socat
+          # Ubuntu 24.04 blocks the unprivileged user namespaces bubblewrap needs.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      - name: Run the evals
+        run: |
+          claude plugin eval plugins/qa-kit --trust-plugin --scaffold --allow-tools Bash Write Edit \
+            --ablation none --model "$EVAL_MODEL" --judge-model "$JUDGE_MODEL" \
+            --threshold 0.8 --max-cost-usd 25 --no-publish \
+            --json evals-result.json --report evals-report.html
+
+      - name: Deterministic graders must all pass
+        if: always() && hashFiles('evals-result.json') != ''
+        run: node plugins/qa-kit/evals/hard-graders.mjs evals-result.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kit-evals-${{ github.run_id }}
+          path: |
+            evals-result.json
+            evals-report.html
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # Fork PRs get no secrets, so the evals can't run there; say so instead of a silent skip.
+  fork-notice:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "::notice::Evals don't run on pull requests from forks (no secrets). A maintainer runs them with workflow_dispatch on the branch."

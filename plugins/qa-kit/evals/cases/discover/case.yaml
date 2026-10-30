@@ -1,0 +1,67 @@
+schema_version: "1.1"
+name: discover
+description: Discover fills the business context, glossary and settings from the owner's answers.
+runs: 1
+context:
+  scaffold_script: setup.sh
+execution:
+  prompt: "/qa-kit:discover"
+  max_turns: 80
+  timeout_seconds: 1500
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Bash, Skill]
+  append_system_prompt: >-
+    This is an unattended evaluation run. No person is present: never call AskUserQuestion and don't wait
+    for replies. The owner answered your questions beforehand in .eval/owner-answers.md; treat each answer
+    there as the owner's reply to the matching question, with the date given there. Don't commit, push or
+    open pull requests; leave the files in the working tree.
+graders:
+  - name: no-peeking
+    type: regex
+    target: trace
+    # The run must not read the suite's own files (known bugs, graders, the confirmed context).
+    pattern: "qa-kit/evals/"
+    match: not_contains
+  - name: no-placeholders-left
+    type: regex
+    target: {source: file, path: .qa/business-context.md}
+    pattern: "BUSINESS_NICHE|JOURNEY_1|MONEY_RULE|ROLE_1"
+    match: not_contains
+  - name: owner-tagged-facts
+    type: regex
+    target: {source: file, path: .qa/business-context.md}
+    pattern: "\\(owner, 2026-10-20\\)"
+  - name: glossary-filled
+    type: regex
+    target: {source: file, path: .qa/glossary.md}
+    pattern: "ONE_LINE_MEANING"
+    match: not_contains
+  - name: accessibility-on
+    type: regex
+    target: {source: file, path: .qa/config.json}
+    pattern: "\"a11y\"\\s*:\\s*true"
+  - name: areas-with-paths
+    type: regex
+    target: {source: file, path: .qa/config.json}
+    pattern: "\"refunds\"\\s*:\\s*\\[\\s*\"[^\"]+\""
+  - name: android-device
+    type: regex
+    target: {source: file, path: .qa/config.json}
+    pattern: "Pixel"
+  - name: disasters-as-rules
+    type: llm
+    focus: {source: file, path: .qa/business-context.md}
+    criteria: >-
+      The "What must never go wrong" section is a numbered list of the owner's five disasters, in this order:
+      (1) refunding more than the shop paid, (2) anyone but a manager refunding, (3) selling stock we don't
+      have, (4) charging a shop twice for one order, (5) a coupon failing on its last day or being used twice
+      by one shop. Each line is a rule a test could prove (not a vague worry like "refunds must work") and
+      ends with "(owner, 2026-10-20)". Pass only if all five are present, in that order, written as rules.
+  - name: context-faithful
+    type: llm
+    focus: {source: file, path: .qa/business-context.md}
+    criteria: >-
+      The file states what the owner said and nothing invented: the March 2026 over-refund (Rs 48,000 on a
+      Rs 4,800 order) and weekly duplicate phone orders as past incidents; email as the outside service with a
+      test inbox and no card payments; Chrome desktop and Chrome on Android; PKR and Karachi time; areas
+      refunds high, orders high, coupons medium, catalogue low. Facts the owner didn't give are marked
+      "(assumed)" or "(code: ...)", never "(owner, ...)". Fail on any invented owner fact.

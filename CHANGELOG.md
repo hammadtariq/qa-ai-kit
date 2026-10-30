@@ -1,5 +1,225 @@
 # Changelog
 
+## 0.9.0 (2026-10-29): extras and checking the kit itself
+
+Phase 4 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, accessibility wasn't checked, every PR
+ran the same `@smoke` set whatever it changed, and prompt changes to the skills shipped untested.
+
+- **Accessibility (opt-in)**: `--with=a11y` adds `<testDir>/support/a11y.ts`, `expectAccessible(page)` on
+  `@axe-core/playwright` (WCAG 2.1 A and AA rules). It fails only on serious and critical issues; minor and
+  moderate ones go in an `a11y` annotation, and the full axe result is attached to the report. With
+  `"a11y": true` in `.qa/config.json`, `generate-tests` adds one `@a11y` test per key-journey page to
+  `<testDir>/a11y/key-pages.spec.ts`. Discover asks about accessibility (area 7) and turns it on. `@a11y`
+  tests need no case id. The installer lists the package to install (`detected.install`), and in standalone
+  mode puts it in `qa/package.json`.
+- **Run only what a PR touches**: `.qa/config.json` → `areas`, e.g.
+  `{ "purchases": ["src/purchases/**", "app/api/purchases/**"] }`. Discover fills it from the code, and
+  plan-feature adds a missing area. `generate-tests` tags tests `@area-<name>`, and `lint-specs` warns on an
+  unknown area tag or a test with none. `node .qa/scripts/areas.mjs --base origin/main` prints the `--grep` for
+  `@smoke` plus the touched areas, and the PR workflow's smoke step uses it. Without `areas` it is `@smoke`,
+  as before; the nightly still runs everything.
+- **Evals for the skills** (`plugins/qa-kit/evals/`, run with `claude plugin eval`): a sample wholesale app
+  with six known bugs, the owner's answers, and three briefs. `discover` and `plan-feature` run unattended,
+  and graders check the business context, `cases.mjs check`, budget, risk coverage, known bugs, duplicates
+  and readability. In this repo, `.github/workflows/kit-evals.yml` runs them on PRs that touch `skills/`,
+  `templates/.qa/scripts/` or `evals/`, and `kit-tests.yml` runs the script tests on every plugin change.
+- Review fixes: `areas.mjs` needs no git without `areas`, and runs `@smoke` with a warning when git can't diff
+  against the base (it used to fail the smoke step); globs take `{a,b}`, `[ab]` and a trailing `/`; every test
+  needs an area tag when `areas` is set (smoke and `@a11y` too); `@a11y` tests cover every key journey from
+  the business context and carry their page's area; the installer adds an extra's packages to an existing
+  `qa/package.json`; evals check the last `check` output, fail a run that reads the suite (`no-peeking`), and
+  CI fails on any failed deterministic grader (`evals/hard-graders.mjs`).
+
+Upgrading from 0.8.x:
+
+1. `/plugin marketplace update qa-ai-kit`.
+2. Copy `.qa/scripts/` from `templates/` (new: `areas.mjs`, `lib/areas.mjs`; changed: `lint-specs.mjs`).
+3. In `qa-pr.yml`, replace the "Smoke tests" step with the template's "Smoke tests and the areas this PR
+   touches".
+4. Set `"kitVersion": "0.9.0"` in `.qa/config.json`. Optional: `areas`, and `"a11y": true` with
+   `--with=a11y` and `npm i -D @axe-core/playwright@^4.14.0`.
+5. Re-run `install-templates.mjs` to refresh the conventions block in `CLAUDE.md`.
+
+## 0.8.0 (2026-10-28): works on any project
+
+Phase 3 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, tests shared seed data, the kit had
+no pattern for email, payments or dates, setup stopped on a repo without `package.json`, TestRail was
+assumed, and only desktop Chrome ran.
+
+- **Test data that cleans up after itself**: a `data` fixture in `fixtures.ts`.
+  `data.create('/api/suppliers', { name: data.name('Supplier') })` creates a record through the app's API,
+  with a name unique to the run and worker, and deletes it when the test ends (last first; a failed delete is
+  a "cleanup" annotation, not a failure). `remove: false` for records the app never deletes, inside a per-run
+  organization. The playbook (new section 8) and `generate-tests` use it instead of ad-hoc setup.
+- **Outside services, dates and time**: playbook section 8 and `generate-tests` rules: payments in the
+  provider's test mode with its test cards, emails and SMS from a test inbox, anything else stubbed with
+  `page.route` and a note on what the stub hides, dates with `page.clock`. New optional extra
+  `--with=mailpit`: `<testDir>/support/mailbox.ts`, `mailbox(request).latest(to, { subject, since })` reads
+  a Mailpit inbox and returns the text and links. Discover records how tests treat each service ("In tests"
+  column).
+- **Repos without Node (standalone mode)**: `install-templates.mjs --standalone` puts Playwright in `qa/`
+  with its own `package.json`, the config in `qa/playwright.config.ts` and tests in `qa/e2e/`; `.qa/` stays
+  at the root (`"playwrightDir": "qa"`). The config finds the repo root, so `.env`, sessions and reports stay
+  there whether tests run from the root (`qa/node_modules/.bin/playwright test -c qa`) or from `qa/`.
+  `patch-agents.mjs` points the agents' MCP server at `qa/`. `app.startCommand` can be any shell command
+  (`bin/rails server -p 3100`). Checked on a small Python app: setup, tests from both folders, CI mode, the
+  MCP server listing the tests.
+- **Tracker as a setting**: `.qa/config.json` → `tracker`, `"testrail"` or `"none"` (default: TestRail when
+  `testrail.projectId` is set). With `none`, `push-cases` stops with a pointer to `generate-tests`, tests
+  carry the CSV key (`tr('PO-07')`), `lint-specs` accepts keys (and warns on a key when the tracker is
+  TestRail), `collect-test-ids` lists keys, upkeep, digest and client-report work from the CSVs and the
+  nightly reports. `node .qa/scripts/cases.mjs tracker` prints the setting for skills and scripts.
+- **Browsers and devices from the contract**: `.qa/config.json` → `browsers`, e.g.
+  `{ "devices": ["Desktop Safari", "iPhone 13"], "locales": ["ar-SA"] }`. Each adds a Playwright project that
+  runs the `@smoke` tests (the P1 journeys); everything else stays on desktop Chrome. Discover (area 7) fills
+  it; the CI action installs the browsers those devices need (`browsers: auto`).
+- CI: the app-setup action installs Node dependencies where Playwright lives and exports `QA_TEST`, the
+  test command the workflows now run. The TestRail upload runs only when the tracker is `testrail`, even if
+  TestRail secrets are set at the organization level.
+- Review fixes: the standalone `qa/package.json` gets a valid npm name when installing into `.`; the
+  installer no longer rewrites the CI action's own commands; `data.create` fails at once when the response
+  has no id to delete it by (instead of a `DELETE .../undefined` cleanup note); `generate-tests`,
+  `review-cases` and setup's env check skip TestRail steps when the tracker is `none`; setup installs
+  `qa/` after the installer writes it, and says to commit `qa/package-lock.json`.
+
+Upgrading from 0.7.x:
+
+1. `/plugin marketplace update qa-ai-kit`.
+2. Copy from `templates/`: `.qa/scripts/` (all of it), `e2e/roles.ts` and `e2e/fixtures.ts` into your test
+   folder (keep any fixtures you added), and `.github/actions/qa-app-setup/action.yml`. Re-run
+   `install-templates.mjs` (as in setup step 4) to refresh the conventions block in `CLAUDE.md`; it skips
+   files you already have.
+3. In `playwright.config.ts`, take from the template: the `qaRoot` import and `root`, the `.env` and
+   `reportDir` lines, `cwd: root` in `webServer`, and the `browsers` block with `...extraProjects`.
+4. In both workflows, replace `npx playwright test` in `run:` lines with `$QA_TEST`, drop
+   `browsers: chromium` from the nightly's app-setup step, and add the template's first line of the
+   "Upload results to TestRail" step (it skips when the tracker isn't TestRail).
+5. Nothing else changes for a TestRail project: without `tracker`, a set `testrail.projectId` still means
+   TestRail. A project without TestRail: set `"tracker": "none"`.
+6. Set `"kitVersion": "0.8.0"` in `.qa/config.json`.
+7. Optional: `browsers` for extra devices; `--with=mailpit` for the email helper.
+
+## 0.7.0 (2026-10-27): fewer, stronger cases
+
+Phase 2 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, the model that wrote the cases also
+pruned them, every case was assumed to be a browser test, the budget was a flat 8-15, and there was one
+login while permission cases need several.
+
+- **Test level per case**: new CSV column `level`, `ui` (empty), `api` or `unit`. The playbook places each
+  check at the cheapest level that can catch it: a validation table is `api` plus at most one `ui` case for
+  the message; a pure calculation is `unit`. `api` cases are Playwright tests with `request` / `apiAs`, still
+  reported to TestRail. `unit` rows are never pushed (a row already in TestRail that moves to `unit` is
+  retired) and the plan lists them under "For developers". `check` warns when a `ui` case has more than 5
+  data rows.
+- **Independent scoring before Gate 1**: `plan-feature` step 5 (and `review-cases` on request) runs a
+  subagent that reads only the CSV, the business context and the glossary, with the brief in
+  `skills/plan-feature/scoring.md`. It scores every row: impact 1-3 × likelihood 1-3, unique, observable.
+  **`cases.mjs apply-scores <csv> <scores.json>`** writes the new `score` column (`3x2`) and suggests
+  `Merge into KEY` for duplicates, `Drop` for impact 1 (however common, unless the reviewer finds in the
+  business context that the owner asked for it: `owner_asked: true`) and for impact × likelihood under 3,
+  `Rewrite` for a Then nobody can see or a P1 without impact 3, each with the reason. It never fills
+  `decision`. On a sample of 8 refund cases a fresh reviewer left 4: two merges, a rare bad-input table and a
+  cosmetic dialog-title case dropped.
+- **Case budget by risk tier** replaces the flat 8-15: `.qa/config.json` → `cases.budget` (defaults low 6,
+  medium 12, high 20, counting `ui` + `api` rows). The tier comes from the area in the business context and
+  is noted in the brief. `check --tier=<tier>` warns over budget and names the lowest-scoring rows; without
+  `--tier` the medium budget applies. `check` warns on a P1 scored below impact 3.
+- `check` fixes: a `ui` case with a long data table still gets the bad-row error next to the "use api"
+  warning; a `data` cell holding only spaces no longer crashes it; a When without a Then no longer adds a
+  warning about an `"undefined"` Then. `apply-scores` warns when a Drop, Merge or Rewrite comes without the
+  reviewer's reason, and `plan` creates the plan's folder if it's missing.
+- **One login per role**: `.qa/config.json` → `roles`, e.g. `{ "manager": { "env": "QA_MANAGER" } }`, read
+  from `QA_MANAGER_EMAIL` / `QA_MANAGER_PASSWORD`. New `e2e/roles.ts`; `auth.setup.ts` logs in once per role
+  and saves `playwright/.auth/<role>.json`; tests start as `defaultRole` (or the first role). New fixtures
+  `asRole(role)` (a page in that role's session) and `apiAs(role)` (a request context with it), so a
+  permission case checks the UI and a direct request in one test. With no `roles`, the single `QA_USER_*`
+  login works as before (an empty `"roles": {}` counts as none). `defaultRole` must be one of the roles:
+  a typo stops the run with `Unknown defaultRole "..."` instead of failing every test on a missing session
+  file. Checked on a small two-role app: the permission case passes, fails when the app lets
+  staff refund, and a project without `roles` still logs in once as `user`.
+- `setup-project` asks which roles have test accounts and fills `roles`, `qa.env.example` and the workflows'
+  env; the CI secrets table lists one pair per role. `generate-tests` writes `api` cases without a page,
+  skips `unit` rows and uses `asRole` / `apiAs` for permission cases. `push-cases` shows `for_developers`.
+
+Upgrading from 0.6.x:
+
+1. `/plugin marketplace update qa-ai-kit`.
+2. Copy `templates/.qa/scripts/cases.mjs` into `.qa/scripts/`, and `templates/e2e/roles.ts` into your test
+   folder.
+3. Single login, nothing else to do: existing CSVs (no `level` or `score`) read as `ui` and unscored, and
+   `auth.setup.ts` / `fixtures.ts` keep working. The flat 8-15 warning becomes the medium budget (12);
+   pass `--tier` for others.
+4. Several roles: replace `auth.setup.ts` and `fixtures.ts` with the templates (keep your login locators and
+   any fixtures you added), add `roles` (and optionally `defaultRole`) to `.qa/config.json`, take the
+   `defaultRole` import and `storageState` line from `templates/playwright.config.ts`, and add one secret pair per role in `.env`,
+   GitHub and each workflow job's `env:`.
+5. Optionally add `cases.budget` to `.qa/config.json` to change the defaults.
+
+## 0.6.0 (2026-10-27): ask the owner, write plain-language cases
+
+Phase 1 of [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md). Before, the business context was guessed
+from repo docs (and on repos without docs, guesses became P1 cases), and cases read like test scripts that a
+non-technical owner couldn't review quickly.
+
+- **New skill `/qa-kit:discover`**: reads the repo, then interviews the product owner one multiple-choice
+  question at a time, each answer drafted from the code and marked "(Recommended)". It follows up on every
+  disaster until it is a rule a test can check, stops when every area is answered (10-20 questions on a first
+  run), and on re-runs asks only about gaps: `(assumed)` facts, facts older than 6 months, placeholders.
+  `/qa-kit:discover <area>` asks about one area. Without an owner in the session it writes drafts tagged
+  `(assumed)` and lists the open questions.
+- **`.qa/business-context.md`** gets a source tag on every fact (`(owner, date)`, `(code: path)` or
+  `(assumed)`) and new sections: roles, key journeys, outside services, support promises, existing test
+  coverage, releases, test environment and data, areas with a risk tier, open questions. Only owner facts
+  justify a P1.
+- **New `.qa/glossary.md`**: about 15 business terms, the words to avoid for each, and the names used in
+  examples.
+- **Cases are Gherkin in the business's words.** New CSV columns `scenario` (Given/When/Then lines) and
+  `background` (shared Given lines, printed once per section in the plan). In TestRail the Given lines are
+  the preconditions and each When/Then pair is one step and its expected result, keywords kept. The plan
+  shows each case as a `gherkin` block, and `from-plan` reads those blocks back.
+- **`cases.mjs check` enforces the writing rules** in `title` and `scenario` (`notes` and quoted text are
+  never checked): errors for click, button, selector, endpoint, status code, database, xpath, css; for a
+  scenario that doesn't start with Given or has a When with no Then; for more than 4 When/Then pairs; and
+  for a `<placeholder>` missing from `data`. Warnings for page, field, screen, form, dropdown, URL, API;
+  titles over 12 words; scenarios over 7 lines; a Then with nothing a person can see or with "correctly",
+  "as expected", "works"; words the glossary avoids or doesn't have.
+- **`cases.mjs migrate <csv>`** converts steps/expected rows to scenarios (Given from preconditions, When
+  from each step, Then from its expected result, "; " splitting into And lines). It never changes `decision`
+  or `testrail_id`, and marks each converted row `Rewrite: converted to Given/When/Then, check the wording`.
+  `from-plan` writes scenarios too (`--legacy` for the old columns).
+- **Playbook** (`test-design.md`): neutral examples from several kinds of business instead of one
+  inventory app, a section on writing Gherkin cases, journeys as When/Then pairs, and good / bad case pairs.
+  New **risk packs** (`skills/plan-feature/risk-packs/`) for ecommerce, SaaS billing, booking, marketplace,
+  fintech ledgers, content / CMS, internal admin and healthcare; discover picks them, and they seed
+  questions, never cases.
+- **`plan-feature`** runs discover when the context is missing or a disaster is `(assumed)`, asks up to
+  about six feature questions one at a time (each with the code's answer recommended) and records them in
+  the brief's new `## Decisions` table, and has the planner write `gherkin` blocks. Without an owner it
+  still posts the questions on the issue and stops.
+- **`review-cases`** judges wording against the new rules (`Rewrite` covers technical wording and cases that
+  are too long), imports TestRail sections as scenarios and offers `migrate` for old CSVs.
+- **`generate-tests`** names each `test.step` after its scenario line (`When the manager approves order
+  A-17`), so the HTML report reads like the case, and loops over `data` rows for placeholders.
+- **`setup-project`** installs the glossary and ends by offering `/qa-kit:discover` (or telling the user to
+  have the owner run it).
+- **Tests for the kit's scripts**: `node --test 'plugins/qa-kit/tests/*.test.mjs'` (no dependencies) covers
+  the old steps/expected path, scenario parsing, the TestRail mapping, the checks, migrate and the plan round
+  trip.
+
+Upgrading from 0.5.x:
+
+1. `/plugin marketplace update qa-ai-kit`.
+2. Copy `templates/.qa/scripts/cases.mjs`, `templates/.qa/glossary.md` and `templates/specs/cases/README.md`
+   into the repo (`.qa/scripts/`, `.qa/`, `specs/cases/`), and add the "Each case is a short Gherkin
+   scenario" line and `/qa-kit:discover` to the QA block in `CLAUDE.md` (from `templates/CLAUDE.qa.md`).
+3. Run `/qa-kit:discover` with the product owner. Your existing `.qa/business-context.md` is kept: discover
+   tags what it finds `(assumed)` until the owner confirms it, and keeps the "must never go wrong" numbers
+   your CSVs already reference.
+4. Existing cases CSVs keep working without changes. To convert one: `node .qa/scripts/cases.mjs migrate
+   <csv>`, reword the converted rows, run `check`, then `/qa-kit:push-cases`. Ids stay the same, but the
+   TestRail text changes to Given/When/Then, so every converted row is sent as an update once and goes back
+   to AI draft for the QA lead to approve again. Rows that weren't converted aren't re-sent.
+
 ## 0.5.0 (2026-10-22): browser agents don't hang
 
 From the pilot: `plan-feature`'s planner sometimes sat for minutes on one browser action until someone

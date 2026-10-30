@@ -1,6 +1,9 @@
 # One-time agency setup
 
-Do these once for the agency. Each client project then takes about an hour with `/qa-kit:setup-project`.
+For an agency running the kit across many client projects. Do these once; each project then takes about an
+hour with `/qa-kit:setup-project`. Setting up one app of your own? Follow
+[GETTING-STARTED.md](GETTING-STARTED.md) instead: you need section 3 (the CI token) and section 4 (GitHub
+settings) from here, and section 2 only if you use TestRail.
 
 ## 1. Host the kit
 

@@ -9,6 +9,11 @@ disable-model-invocation: true
 
 Cases file: `$ARGUMENTS` (if empty, list `specs/cases/*.csv` and ask which one).
 
+First run `node .qa/scripts/cases.mjs tracker`. If it prints `none`, there is nothing to push: the CSV is the
+record, the reviewer's `Keep` is the approval, and tests carry the row's key. Say so and point to
+`/qa-kit:generate-tests <csv>`. (To start using TestRail, set `"tracker": "testrail"` and `testrail.projectId`
+in `.qa/config.json`, then run this again.)
+
 The CSV is the source of truth for case design and the reviewer's `decision` column is the Gate 1
 review. This skill copies the result to TestRail. It never approves cases: pushed cases arrive as
 **AI draft**, and the QA lead bulk-approves them in TestRail (select the section's cases → Edit Selected
@@ -25,8 +30,9 @@ node .qa/scripts/cases.mjs payload <csv>
 - `check --push` must report no errors. Undecided rows and `Rewrite` rows are errors here: the reviewer
   finishes the review first. Show the user the errors and stop.
 - `payload` prints `create` (Keep rows without a `testrail_id`), `update` (Keep rows with one),
-  `retire` (Drop or Merge rows that are already in TestRail) and `held_back`, with TestRail-ready
-  preconditions and steps. Use these texts as they are; don't rewrite cases while pushing.
+  `retire` (Drop or Merge rows that are already in TestRail, and Keep rows moved to `level` = `unit`),
+  `held_back` and `for_developers` (`unit` rows, never pushed), with TestRail-ready preconditions and
+  steps. Use these texts as they are; don't rewrite cases while pushing.
 
 ## 2. Find the section
 
@@ -48,7 +54,9 @@ Tell the user, before changing anything:
 - **retire**: ids to move into the `Retired` section;
 - **in TestRail but not in the CSV**: case ids in the section that no row mentions. Ask whether to retire
   them or add them to the CSV; never retire them without a yes;
-- **held back**: rows not pushed and why.
+- **held back**: rows not pushed and why;
+- **for developers**: `unit` rows, which stay in the CSV and the plan's "For developers" list instead of
+  TestRail.
 
 Wait for a yes.
 

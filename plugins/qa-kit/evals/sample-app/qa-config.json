@@ -1,0 +1,7 @@
+{
+  "name": "kolachi-supplies",
+  "tracker": "none",
+  "app": { "startCommand": "node server.mjs", "devCommand": "node server.mjs", "port": 3100, "readyPath": "/login" },
+  "roles": { "manager": { "env": "QA_MANAGER" }, "staff": { "env": "QA_STAFF" }, "shop": { "env": "QA_SHOP" } },
+  "defaultRole": "manager"
+}

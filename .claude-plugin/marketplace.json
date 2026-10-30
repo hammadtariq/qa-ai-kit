@@ -8,7 +8,7 @@
     {
       "name": "qa-kit",
       "source": "./plugins/qa-kit",
-      "description": "Plan, generate, triage and report on Playwright tests with TestRail, with human review gates"
+      "description": "Owner interview, plain-English test cases, Playwright tests and CI triage, with human review gates; TestRail optional"
     }
   ]
 }

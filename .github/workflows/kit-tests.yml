@@ -1,0 +1,23 @@
+# The kit's own script tests (installer, cases.mjs, lint, areas), on every change to the plugin.
+name: Kit - script tests
+
+on:
+  pull_request:
+    paths: ["plugins/qa-kit/**"]
+  push:
+    branches: [main]
+    paths: ["plugins/qa-kit/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test 'plugins/qa-kit/tests/*.test.mjs'

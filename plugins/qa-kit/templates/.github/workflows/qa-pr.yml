@@ -1,5 +1,6 @@
-# QA Kit: PR checks. Lint the specs, run changed tests and @smoke (against BASE_URL, or this PR's build
-# when BASE_URL is unset), upload results to TestRail, and on failure let Claude triage and comment.
+# QA Kit: PR checks. Lint the specs, run changed tests, @smoke and the tests of the areas the PR touches
+# (`areas` in .qa/config.json; against BASE_URL, or this PR's build when BASE_URL is unset), upload results to
+# TestRail, and on failure let Claude triage and comment.
 name: QA - PR checks
 
 on:
@@ -37,6 +38,9 @@ jobs:
       TESTRAIL_URL: ${{ secrets.TESTRAIL_URL }}
       TESTRAIL_USER: ${{ secrets.TESTRAIL_USER }}
       TESTRAIL_API_KEY: ${{ secrets.TESTRAIL_API_KEY }}
+      # One pair per role when .qa/config.json has "roles" (setup-project fills these in):
+      # QA_ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+      # QA_ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,14 +62,16 @@ jobs:
         continue-on-error: true
         env:
           QA_REPORT_DIR: reports/changed
-        run: npx playwright test --only-changed=origin/${{ github.base_ref }} --grep-invert @quarantine --pass-with-no-tests
+        run: $QA_TEST --only-changed=origin/${{ github.base_ref }} --grep-invert @quarantine --pass-with-no-tests
 
-      - name: Smoke tests
+      - name: Smoke tests and the areas this PR touches
         id: smoke
         continue-on-error: true
         env:
           QA_REPORT_DIR: reports/smoke
-        run: npx playwright test --grep @smoke --grep-invert @quarantine --pass-with-no-tests
+        run: |
+          grep=$(node .qa/scripts/areas.mjs --base origin/${{ github.base_ref }})
+          $QA_TEST --grep "$grep" --grep-invert @quarantine --pass-with-no-tests
 
       - name: Upload results to TestRail
         if: always() && env.TESTRAIL_URL != '' && vars.TESTRAIL_PROJECT_NAME != ''
@@ -76,6 +82,7 @@ jobs:
           PR_SHA: ${{ github.event.pull_request.head.sha }}
           TESTRAIL_PROJECT_NAME: ${{ vars.TESTRAIL_PROJECT_NAME }}
         run: |
+          [ "$(node .qa/scripts/cases.mjs tracker)" = testrail ] || { echo "The tracker is not TestRail (.qa/config.json); skipping upload."; exit 0; }
           ls reports/*/junit.xml >/dev/null 2>&1 || { echo "No JUnit reports"; exit 0; }
           # trcli refuses to create a run when no test is linked to a case, and fails the step.
           grep -qs 'name="test_id"' reports/*/junit.xml || { echo "No tests are linked to TestRail cases yet (tr('C123')); skipping upload."; exit 0; }
@@ -125,6 +132,9 @@ jobs:
       QA_LOCK_ASSERTIONS: "1"
       GH_TOKEN: ${{ github.token }}
       BASE_URL: ${{ vars.BASE_URL }}
+      # One pair per role when .qa/config.json has "roles" (setup-project fills these in):
+      # QA_ADMIN_EMAIL: ${{ secrets.QA_ADMIN_EMAIL }}
+      # QA_ADMIN_PASSWORD: ${{ secrets.QA_ADMIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
