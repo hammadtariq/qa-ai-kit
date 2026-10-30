@@ -1,6 +1,7 @@
 # The kit's eval suite (plugins/qa-kit/evals): discover and plan-feature run unattended on a sample app with
 # known bugs, and graders check the business context and the cases CSVs. Runs on PRs that change the skills,
-# the .qa scripts or the evals. Costs model calls: each run is capped by --max-cost-usd.
+# the .qa scripts or the evals. Costs model calls: each run is capped by --max-cost-usd. The score threshold
+# (0.8) absorbs noisy judges; hard-graders.mjs then fails the job on any failed deterministic grader.
 name: Kit - skill evals
 
 on:
@@ -51,6 +52,10 @@ jobs:
             --threshold 0.8 --max-cost-usd 25 --no-publish \
             --json evals-result.json --report evals-report.html
 
+      - name: Deterministic graders must all pass
+        if: always() && hashFiles('evals-result.json') != ''
+        run: node plugins/qa-kit/evals/hard-graders.mjs evals-result.json
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -60,3 +65,10 @@ jobs:
             evals-report.html
           retention-days: 14
           if-no-files-found: ignore
+
+  # Fork PRs get no secrets, so the evals can't run there; say so instead of a silent skip.
+  fork-notice:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "::notice::Evals don't run on pull requests from forks (no secrets). A maintainer runs them with workflow_dispatch on the branch."

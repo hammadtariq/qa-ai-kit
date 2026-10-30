@@ -26,7 +26,7 @@ case "${1:-}" in
   plan)
     cp "$EVALS/context/business-context.md" "$EVALS/context/glossary.md" .qa/
     mkdir -p specs/briefs
-    cp "$EVALS/briefs/$2.md" specs/briefs/
+    cp "$EVALS/briefs/${2:?usage: scaffold.sh plan <feature>}.md" specs/briefs/
     ;;
   *) echo "usage: scaffold.sh discover | plan <feature>" >&2; exit 1 ;;
 esac

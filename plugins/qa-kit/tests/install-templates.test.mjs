@@ -110,3 +110,15 @@ test("--with=a11y: the axe helper, its notes, and the package to install (in qa/
   assert.equal(JSON.parse(read(qa, "qa/package.json")).devDependencies["@axe-core/playwright"], "^4.14.0");
   assert.match(read(qa, "CLAUDE.md"), /qa\/e2e\/a11y\/key-pages\.spec\.ts/);
 });
+
+test("standalone re-run with --with=a11y adds the package to an existing qa/package.json", () => {
+  const dir = mkdtempSync(join(tmpdir(), "qa-kit-install-"));
+  install(dir, "--standalone");
+  assert.equal(JSON.parse(read(dir, "qa/package.json")).devDependencies["@axe-core/playwright"], undefined);
+  const out = install(dir, "--standalone", "--with=a11y");
+  assert.ok(out.merged.includes("qa/package.json (+@axe-core/playwright)"), JSON.stringify(out.merged));
+  const qaPkg = JSON.parse(read(dir, "qa/package.json"));
+  assert.equal(qaPkg.devDependencies["@axe-core/playwright"], "^4.14.0");
+  assert.equal(qaPkg.devDependencies["@playwright/test"], "^1.64.1");
+  assert.ok(install(dir, "--standalone", "--with=a11y").skipped.includes("qa/package.json"));
+});

@@ -14,8 +14,15 @@ execution:
     for replies; the brief's Decisions table holds the owner's answers. No browser and no running app are
     available: where the skill would explore the app with the planner agent, read the code, the brief and
     the business context instead, and write the plan from them. Use the feature slug given in the prompt.
+    Finish by running `node .qa/scripts/cases.mjs check` on the cases CSV and don't change the CSV after it.
     Don't commit, push or open pull requests; leave the files in the working tree.
 graders:
+  - name: no-peeking
+    type: regex
+    target: trace
+    # The run must not read the suite's own files (known bugs, graders, the confirmed context).
+    pattern: "qa-kit/evals/"
+    match: not_contains
   - name: cases-file
     type: regex
     target: {source: file, path: specs/cases/refunds.csv}
@@ -24,10 +31,11 @@ graders:
     type: tool_used
     tool: Bash
     input_match: "cases\\.mjs check"
-  - name: check-clean
+  - name: last-check-clean
     type: regex
     target: trace
-    pattern: "(^|[^0-9])0 error\\(s\\)"
+    # The last "N error(s), M warning(s)" line cases.mjs check printed says 0 errors.
+    pattern: "[^0-9]0 error\\(s\\), \\d+ warning\\(s\\)(?![\\s\\S]*\\d error\\(s\\), \\d+ warning\\(s\\))"
   - name: within-budget
     type: llm
     focus: {source: file, path: specs/cases/refunds.csv}

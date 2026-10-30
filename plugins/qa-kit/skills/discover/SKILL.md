@@ -95,7 +95,7 @@ them. `plan-feature` will not use `(assumed)` facts to justify a P1.
   Edge → `"Desktop Edge"`). These run the P1 journeys (`@smoke`); everything runs on desktop Chrome.
 - **Accessibility (area 7):** "required" or "we'd like to" → `"a11y": true` in `.qa/config.json`. If the
   project has no `<testDir>/support/a11y.ts`, tell the user to re-run the installer with `--with=a11y`.
-  Each page of a key journey then gets an axe check (`@a11y`) when its feature's tests are written.
+  The next `/qa-kit:generate-tests` run adds an axe check (`@a11y`) for every page of the key journeys.
 - **Areas (Areas and risk tiers):** for each area in the table, set `.qa/config.json` → `areas` with the
   source folders that belong to it, read from the code (`"purchases": ["src/purchases/**",
   "app/api/purchases/**"]`, names in lower case with dashes). Leave out shared code (layouts, auth, utils);

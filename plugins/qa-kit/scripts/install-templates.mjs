@@ -184,8 +184,17 @@ upsertClaudeMd(standaloneCommands(retarget(block)));
 // Standalone: Playwright's own package.json in qa/ (setup installs it there).
 if (standalone) {
   const qaPkg = join(pwDir, "package.json");
-  if (existsSync(join(dest, qaPkg))) skipped.push(qaPkg);
-  else {
+  if (existsSync(join(dest, qaPkg))) {
+    // Already there: add only the extras' packages it lacks (`npm install --prefix qa` then installs them).
+    const current = readJson(join(dest, qaPkg));
+    const missing = Object.entries(extraPackages).filter(([p]) => !current?.devDependencies?.[p] && !current?.dependencies?.[p]);
+    if (!current || !missing.length) skipped.push(qaPkg);
+    else {
+      current.devDependencies = { ...current.devDependencies, ...Object.fromEntries(missing) };
+      writeFile(qaPkg, JSON.stringify(current, null, 2) + "\n");
+      merged.push(`${qaPkg} (+${missing.map(([p]) => p).join(", ")})`);
+    }
+  } else {
     // npm names can't start with a dot or underscore, so strip those (a scoped name loses its scope too).
     const base = (pkg.name || basename(resolve(dest))).replace(/^@[^/]+\//, "").replace(/[^\w.-]/g, "-").replace(/^[._-]+/, "").toLowerCase();
     const name = `${base || "app"}-qa`;

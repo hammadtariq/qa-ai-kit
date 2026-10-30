@@ -65,7 +65,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/install-templates.mjs" "${CLAUDE_PLUGIN_ROOT
 should read it: it adds `<folder>/support/mailbox.ts`, which reads a Mailpit test inbox (`MAILPIT_URL`).
 `--with=a11y` when `a11y` is on (discover, or the user asks): it adds `<folder>/support/a11y.ts`, axe checks
 for key pages. Install what `detected.install` lists with the repo's package manager
-(`npm i -D @axe-core/playwright@^4.14.0`); in standalone mode it is already in `qa/package.json`.
+(`npm i -D @axe-core/playwright@^4.14.0`); in standalone mode the installer adds it to `qa/package.json`, so `npm install --prefix qa` installs it.
 
 It prints JSON with `created`, `merged`, `skipped` and `detected` (package manager, Node, antd, unit runner):
 

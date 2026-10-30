@@ -7,7 +7,7 @@
 
 import { readFileSync } from 'node:fs';
 import { findSpecFiles, parseSpec, loadQaConfig, trackerOf, isTestRailId } from './lib/specs.mjs';
-import { areasOf } from './lib/areas.mjs';
+import { validatedAreas, areaTagsOf, AREA_TAG } from './lib/areas.mjs';
 
 const args = process.argv.slice(2);
 const json = args.includes('--json');
@@ -18,7 +18,7 @@ const files = findSpecFiles(targets.length ? targets : [cfg.testDir || 'tests'])
 const SEED = /(^|\/)seed\.spec\.[jt]s$/;
 let areas = [];
 try {
-  areas = Object.keys(areasOf(cfg));
+  areas = Object.keys(validatedAreas(cfg));
 } catch (e) {
   console.error(e.message);
   process.exit(1);
@@ -47,7 +47,8 @@ for (const file of files) {
   if (SEED.test(file)) continue;
   for (const t of parseSpec(file)) {
     // Accessibility checks (@a11y) cover pages, not cases, so they carry no id.
-    if (t.caseIds.length === 0 && !t.tags.includes('@a11y')) {
+    const isA11y = t.tags.includes('@a11y');
+    if (t.caseIds.length === 0 && !isA11y) {
       add('error', file, t.line, 'test-id', tracker === 'testrail'
         ? `"${t.title}" has no TestRail id. Add { annotation: tr('C123') } so its result reaches TestRail`
         : `"${t.title}" has no case key. Add { annotation: tr('PO-07') } with its row's key in specs/cases/`);
@@ -57,13 +58,13 @@ for (const file of files) {
         add('warn', file, t.line, 'test-id', `"${t.title}" links to ${id}, a CSV key; push the case (/qa-kit:push-cases) and use its TestRail id so the result reaches TestRail`);
       }
     }
-    if (areas.length && !t.tags.includes('@a11y')) {
-      const tagged = t.tags.filter((x) => x.startsWith('@area-')).map((x) => x.slice(6));
+    if (areas.length) {
+      const tagged = areaTagsOf(t.tags);
       for (const name of tagged.filter((x) => !areas.includes(x))) {
-        add('warn', file, t.line, 'area', `"${t.title}" is tagged @area-${name}, which isn't in "areas" in .qa/config.json`);
+        add('warn', file, t.line, 'area', `"${t.title}" is tagged ${AREA_TAG}${name}, which isn't in "areas" in .qa/config.json`);
       }
-      if (!tagged.length && !t.tags.includes('@smoke')) {
-        add('warn', file, t.line, 'area', `"${t.title}" has no @area-<name> tag, so PRs run it only when they change its file (areas: ${areas.join(', ')})`);
+      if (!tagged.length) {
+        add('warn', file, t.line, 'area', `"${t.title}" has no ${AREA_TAG}<name> tag, so a PR that changes its area's code won't pick it (areas: ${areas.join(', ')})`);
       }
     }
     if (!t.hasAssertion && !t.fixme && t.modifier !== 'skip') {

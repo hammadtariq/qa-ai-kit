@@ -103,11 +103,14 @@ which match `CLAUDE.md`:
   (or `page.clock.install` plus `fastForward` for expiry and timers) before the page loads, instead of
   waiting or editing data. Time zones and formats through `test.use({ timezoneId, locale })`.
 
-- **Accessibility** (`.qa/config.json` → `a11y` is `true`): for each page this feature adds to a key
-  journey, add one test to `<testDir>/a11y/key-pages.spec.ts`: `tag: '@a11y'`, no case id, open the page in
-  the state a user sees it (signed in, data loaded, assert something visible first), then
-  `await expectAccessible(page)` from `<testDir>/support/a11y.ts` (installed with `--with=a11y`). Skip pages
-  already in the file. It fails only on serious and critical issues; never weaken it to pass.
+- **Accessibility** (`.qa/config.json` → `a11y` is `true`): `<testDir>/a11y/key-pages.spec.ts` holds one
+  test per page of the key journeys in `.qa/business-context.md` ("Key journeys"). If the file is missing
+  or lacks a journey's pages (`a11y` was just turned on), add them all now, not only this feature's; then
+  add any page this feature adds to a key journey. Each test: `tag: ['@a11y', '@area-<name>']` (the page's
+  area, when `areas` is set, so PRs that change it run the check), no case id, open the page in the state a
+  user sees it (signed in, data loaded, assert something visible first), then
+  `await expectAccessible(page)` from `<testDir>/support/a11y.ts` (installed with `--with=a11y`). It fails
+  only on serious and critical issues; never weaken it to pass.
 
 ## 3. Verify
 

@@ -348,13 +348,22 @@ Prompt changes today ship untested. Add `evals/`:
 
 - The eval suite runs in CI on PRs that touch `skills/` or `templates/.qa/scripts/`.
 
-As built (0.9.0), with small changes from the draft above: accessibility is an install extra (`--with=a11y`,
-`expectAccessible(page)`) plus `"a11y": true`, and its tests live in one `<testDir>/a11y/key-pages.spec.ts`
-with no case id. Areas are plain path globs matched by `.qa/scripts/areas.mjs` (no glob dependency); files
-in no area add nothing beyond `@smoke`, and `lint-specs` warns on a test without an area tag. `claude plugin
-eval` has no script graders, so "`cases.mjs check` has no errors" is a regex on the run's trace, and budget,
-risk coverage and duplicates are judged on the CSV; the sample app has two known bugs per ticket. The eval
-runs are unattended and have no browser, so `plan-feature` plans from the code, not the planner agent.
+As built (0.9.0), with small changes from the draft above:
+
+- Accessibility is an install extra (`--with=a11y`, `expectAccessible(page)`) plus `"a11y": true`. Its tests
+  live in one `<testDir>/a11y/key-pages.spec.ts` with no case id, one per key-journey page from the business
+  context, written by `generate-tests` (all journeys on its first run with `a11y` on). Each carries the
+  page's `@area-<name>`, so a PR runs it when it changes that area; they are not `@smoke`.
+- Areas are path globs (`**`, `*`, `?`, `{a,b}`, `[ab]`) matched by `.qa/scripts/areas.mjs`, no dependency.
+  Files in no area add nothing beyond `@smoke`. When git can't list the changed files, the PR runs `@smoke`
+  with a warning. `lint-specs` warns on a test without an area tag.
+- `claude plugin eval` has no script graders. "`cases.mjs check` has no errors" is a regex on the run's
+  trace: the last `check` output must say 0 errors, and the run is told to end with `check`. That is close
+  to, but not the same as, running `check` on the final CSV. Budget, risk coverage, duplicates and
+  readability are judged on the CSV. CI fails on any failed deterministic grader even above the 0.8 score.
+  The sample app has two known bugs per ticket, and a `no-peeking` grader fails a run that reads the suite.
+- The eval runs are unattended and have no browser, so `plan-feature` plans from the code, not the planner
+  agent; browser exploration isn't covered. Fork PRs skip the evals (no secrets).
 
 ## Risks
 

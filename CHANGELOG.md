@@ -23,6 +23,12 @@ ran the same `@smoke` set whatever it changed, and prompt changes to the skills 
   and graders check the business context, `cases.mjs check`, budget, risk coverage, known bugs, duplicates
   and readability. In this repo, `.github/workflows/kit-evals.yml` runs them on PRs that touch `skills/`,
   `templates/.qa/scripts/` or `evals/`, and `kit-tests.yml` runs the script tests on every plugin change.
+- Review fixes: `areas.mjs` needs no git without `areas`, and runs `@smoke` with a warning when git can't diff
+  against the base (it used to fail the smoke step); globs take `{a,b}`, `[ab]` and a trailing `/`; every test
+  needs an area tag when `areas` is set (smoke and `@a11y` too); `@a11y` tests cover every key journey from
+  the business context and carry their page's area; the installer adds an extra's packages to an existing
+  `qa/package.json`; evals check the last `check` output, fail a run that reads the suite (`no-peeking`), and
+  CI fails on any failed deterministic grader (`evals/hard-graders.mjs`).
 
 Upgrading from 0.8.x:
 

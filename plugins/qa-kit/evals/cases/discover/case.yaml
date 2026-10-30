@@ -15,6 +15,12 @@ execution:
     there as the owner's reply to the matching question, with the date given there. Don't commit, push or
     open pull requests; leave the files in the working tree.
 graders:
+  - name: no-peeking
+    type: regex
+    target: trace
+    # The run must not read the suite's own files (known bugs, graders, the confirmed context).
+    pattern: "qa-kit/evals/"
+    match: not_contains
   - name: no-placeholders-left
     type: regex
     target: {source: file, path: .qa/business-context.md}
